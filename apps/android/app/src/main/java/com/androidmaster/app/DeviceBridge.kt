@@ -130,7 +130,7 @@ class DeviceBridge(private val context: Context) {
         })
     }
     private fun scheduleReconnect(){if(!reconnectWanted)return;handler.removeCallbacks(reconnectTask);handler.postDelayed(reconnectTask,reconnectDelayMs);reconnectDelayMs=(reconnectDelayMs*2).coerceAtMost(30000L)}
-    fun disconnect(clearSaved:Boolean=true){reconnectWanted=false;handler.removeCallbacks(reconnectTask);socket?.close(1000,"user_disconnected");socket=null;if(clearSaved){prefs.edit().remove("relay_url").remove("device_code").apply();lastUrl="";lastRoom=""};_state.value=_state.value.copy(connected=false,connecting=false,lastMessage="Disconnected")}
+    fun disconnect(clearSaved:Boolean=true){reconnectWanted=false;handler.removeCallbacks(reconnectTask);socket?.close(1000,"user_disconnected");socket=null;try{uploadStream?.close()}catch(_:Exception){};uploadStream=null;uploadTransferId=null;if(clearSaved){prefs.edit().remove("relay_url").remove("device_code").apply();lastUrl="";lastRoom=""};_state.value=_state.value.copy(connected=false,connecting=false,lastMessage="Disconnected")}
     fun saveFileTree(uri:Uri){prefs.edit().putString("file_tree_uri",uri.toString()).apply();_state.value=_state.value.copy(fileAccessEnabled=true);reportDeviceEvent("files.permission",true,"Shared folder access saved")}
     private fun fileTreeUri():Uri?=prefs.getString("file_tree_uri",null)?.let{Uri.parse(it)}
     private fun fileEvent(event:String,data:JSONObject){send("device.event",JSONObject().put("event",event).put("message",data.toString()))}
