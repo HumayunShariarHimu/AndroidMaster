@@ -66,6 +66,7 @@ class DeviceBridge(private val context: Context) {
         val secret=room.trim()
         if(!base.startsWith("ws://")&&!base.startsWith("wss://")){_state.value=_state.value.copy(error="Relay URL must start with ws:// or wss://");return}
         if(!Regex("^[a-fA-F0-9]{48}$").matches(secret)){_state.value=_state.value.copy(error="Pairing secret must be the 48-character value shown by the dashboard");return}
+        if(reconnectWanted && lastUrl==base && lastRoom==secret && (_state.value.connected || _state.value.connecting)) return
         handler.removeCallbacks(reconnectTask)
         reconnectWanted=true
         lastUrl=base;lastRoom=secret;reconnectDelayMs=3000L
@@ -74,8 +75,13 @@ class DeviceBridge(private val context: Context) {
         val request=Request.Builder().url("$base/ws?role=device&room=$secret").build()
         _state.value=_state.value.copy(connecting=true,error=null,lastMessage="Connecting to relay…")
         socket=client.newWebSocket(request,object:WebSocketListener(){
-            override fun onOpen(webSocket:WebSocket,response:Response){_state.value=_state.value.copy(connected=true,connecting=false,error=null,lastMessage="Connected to relay")}
+            override fun onOpen(webSocket:WebSocket,response:Response){
+                if(socket!==webSocket)return
+                reconnectDelayMs=3000L
+                _state.value=_state.value.copy(connected=true,connecting=false,error=null,lastMessage="Connected to relay")
+            }
             override fun onMessage(webSocket:WebSocket,text:String){
+                if(socket!==webSocket)return
                 try {
                     val msg=JSONObject(text);val type=msg.optString("type");val payload=msg.optJSONObject("payload")?:JSONObject()
                     when(type){
@@ -86,8 +92,18 @@ class DeviceBridge(private val context: Context) {
                     }
                 }catch(e:Exception){_state.value=_state.value.copy(error="Invalid relay message: ${e.message}")}
             }
-            override fun onFailure(webSocket:WebSocket,t:Throwable,response:Response?){_state.value=_state.value.copy(connected=false,connecting=false,error=t.message?:"Relay connection failed",lastMessage="Connection failed");scheduleReconnect()}
-            override fun onClosed(webSocket:WebSocket,code:Int,reason:String){_state.value=_state.value.copy(connected=false,connecting=false,lastMessage="Disconnected: $reason");scheduleReconnect()}
+            override fun onFailure(webSocket:WebSocket,t:Throwable,response:Response?){
+                if(socket!==webSocket)return
+                socket=null
+                _state.value=_state.value.copy(connected=false,connecting=false,error=t.message?:"Relay connection failed",lastMessage="Connection failed")
+                scheduleReconnect()
+            }
+            override fun onClosed(webSocket:WebSocket,code:Int,reason:String){
+                if(socket!==webSocket)return
+                socket=null
+                _state.value=_state.value.copy(connected=false,connecting=false,lastMessage="Disconnected: $reason")
+                scheduleReconnect()
+            }
         })
     }
     private fun scheduleReconnect(){if(!reconnectWanted)return;handler.removeCallbacks(reconnectTask);handler.postDelayed(reconnectTask,reconnectDelayMs);reconnectDelayMs=(reconnectDelayMs*2).coerceAtMost(30000L)}
