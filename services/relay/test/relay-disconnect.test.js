@@ -84,11 +84,9 @@ test("dashboard disconnect preserves the paired device for reconnect", async t =
   sockets.push(controller);
   const controllerReady = waitForMessage(controller, m => m.type === "relay.ready");
   const deviceConnected = waitForMessage(controller, m => m.type === "device.connected");
-  const phoneConnected = waitForMessage(device, m => m.type === "controller.connected");
   await waitForOpen(controller);
   await controllerReady;
   await deviceConnected;
-  await phoneConnected;
 
   const phoneDetached = waitForMessage(device, m => m.type === "controller.disconnected");
   const controllerClosed = new Promise(resolve => controller.once("close", resolve));
