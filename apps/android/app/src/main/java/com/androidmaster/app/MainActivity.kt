@@ -90,7 +90,7 @@ private fun CompanionScreen(state:BridgeState,onConnect:(String,String)->Unit,on
         state.error?.let{Text("Error: $it",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
         Divider()
         Text("Permissions & features",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
-        Text("This build uses internet access and installed-app visibility to list and launch apps. Screen capture, notifications, files and other sensitive permissions will be added with their own visible consent flows.",style=MaterialTheme.typography.bodySmall)
+        Text("AndroidMaster requests notification permission for its persistent connection notification. Screen capture, remote touch, files, camera and notification-reading controls are not implemented in this build yet.",style=MaterialTheme.typography.bodySmall)
         if(showApps){
             Text("Launchable apps visible to AndroidMaster: ${state.apps.size}",fontWeight=FontWeight.Medium)
             Column(verticalArrangement=Arrangement.spacedBy(6.dp)){
@@ -107,7 +107,7 @@ private fun CompanionScreen(state:BridgeState,onConnect:(String,String)->Unit,on
             }
         }else{
             Spacer(Modifier.height(4.dp))
-            Text("Keep this app open while paired. The dashboard can request the real app list and launch apps on this phone.",style=MaterialTheme.typography.bodySmall)
+            Text("The foreground service can maintain the relay connection while this screen is closed. Android may still stop it if you force-stop the app, reboot the phone, or restrict background activity.",style=MaterialTheme.typography.bodySmall)
         }
     }
 }
