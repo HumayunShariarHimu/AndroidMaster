@@ -89,6 +89,8 @@ class DeviceBridge(private val context: Context) {
                         "device.status.get"->send("device.status.result",statusPayload())
                         "apps.list"->sendApps()
                         "app.launch"->launchApp(payload.optString("packageName"))
+                        "remote.gesture"->performRemoteSwipe(payload)
+                        "remote.global_action"->performGlobalAction(payload.optString("action"))
                     }
                 }catch(e:Exception){_state.value=_state.value.copy(error="Invalid relay message: ${e.message}")}
             }
@@ -134,6 +136,21 @@ class DeviceBridge(private val context: Context) {
         apps.forEach{array.put(JSONObject().put("label",it.label).put("packageName",it.packageName))}
         _state.value=_state.value.copy(apps=apps,lastMessage="Sent ${apps.size} launchable apps")
         send("apps.list.result",JSONObject().put("apps",array))
+    }
+    private fun performRemoteSwipe(payload:JSONObject){
+        val service=RemoteAccessibilityService.instance
+        if(service==null){
+            send("device.event",JSONObject().put("event","gesture.result").put("ok",false).put("message","Enable AndroidMaster Accessibility service in Android Settings first"))
+            return
+        }
+        service.swipe(payload.optDouble("x1",0.5).toFloat(),payload.optDouble("y1",0.8).toFloat(),payload.optDouble("x2",0.5).toFloat(),payload.optDouble("y2",0.2).toFloat(),payload.optLong("durationMs",350L)){ok->
+            send("device.event",JSONObject().put("event","gesture.result").put("ok",ok).put("message",if(ok)"Swipe dispatched" else "Android cancelled the gesture"))
+        }
+    }
+    private fun performGlobalAction(action:String){
+        val service=RemoteAccessibilityService.instance
+        val ok=service?.globalAction(action)?:false
+        send("device.event",JSONObject().put("event","navigation.result").put("ok",ok).put("action",action).put("message",if(ok)"Navigation action dispatched" else "Enable AndroidMaster Accessibility service in Android Settings first"))
     }
     private fun launchApp(packageName:String){
         if(packageName.isBlank()||packageName.length>255){send("app.launch.result",JSONObject().put("ok",false).put("message","Invalid package name"));return}
