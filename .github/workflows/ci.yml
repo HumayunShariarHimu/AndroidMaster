@@ -40,6 +40,7 @@ jobs:
           cache-dependency-path: services/relay/package.json
       - run: npm install
       - run: npm run check
+      - run: npm test
 
   android:
     name: Android debug APK build
