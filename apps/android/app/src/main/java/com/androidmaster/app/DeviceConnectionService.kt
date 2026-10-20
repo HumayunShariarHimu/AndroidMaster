@@ -88,6 +88,8 @@ class DeviceConnectionService : Service() {
         fun stop(context: Context) {
             DeviceBridgeHolder.get(context).disconnect()
             context.stopService(Intent(context, DeviceConnectionService::class.java))
+            context.stopService(Intent(context, ScreenCaptureService::class.java))
+            context.stopService(Intent(context, CameraPreviewService::class.java))
         }
     }
 }
