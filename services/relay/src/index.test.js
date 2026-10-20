@@ -58,3 +58,23 @@ test("explicit controller disconnect notifies the device before closing the room
   const message=await disconnected;
   assert.equal(message.payload.reason,"owner_disconnected");
 });
+
+
+test("relay forwards validated remote tap coordinates to the Android device",async t=>{
+  const port=await startRelay(t);const room=roomCode();
+  const controller=await connect(port,"controller",room);t.after(()=>controller.terminate());
+  const device=await connect(port,"device",room);t.after(()=>device.terminate());
+  controller.send(JSON.stringify({type:"remote.tap",payload:{x:0.42,y:0.63}}));
+  const forwarded=await nextMessage(device,m=>m.type==="remote.tap");
+  assert.equal(forwarded.payload.x,0.42);
+  assert.equal(forwarded.payload.y,0.63);
+});
+
+test("relay rejects remote taps with coordinates outside the normalized screen",async t=>{
+  const port=await startRelay(t);const room=roomCode();
+  const controller=await connect(port,"controller",room);t.after(()=>controller.terminate());
+  const device=await connect(port,"device",room);t.after(()=>device.terminate());
+  controller.send(JSON.stringify({type:"remote.tap",payload:{x:1.5,y:0.2}}));
+  const error=await nextMessage(controller,m=>m.type==="relay.error");
+  assert.equal(error.payload.message,"invalid_tap_coordinates");
+});
