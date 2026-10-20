@@ -1,6 +1,11 @@
 package com.androidmaster.app
 
 import android.os.Bundle
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
@@ -38,15 +43,17 @@ import androidx.compose.ui.unit.dp
 
 class MainActivity:ComponentActivity(){
     private lateinit var bridge:DeviceBridge
+    private val notificationPermissionLauncher=registerForActivityResult(ActivityResultContracts.RequestPermission()){}
     override fun onCreate(savedInstanceState:Bundle?){
         super.onCreate(savedInstanceState)
-        bridge=DeviceBridge(applicationContext)
-        bridge.autoConnectSaved()
+        bridge=DeviceBridgeHolder.get(applicationContext)
+        if(Build.VERSION.SDK_INT>=33&&ContextCompat.checkSelfPermission(this,Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        if(bridge.hasSavedConnection())DeviceConnectionService.startSaved(this)
         setContent {
             MaterialTheme {
                 val state by bridge.state.collectAsState()
                 Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background) {
-                    CompanionScreen(state,{url,room->bridge.connect(url,room)},{bridge.disconnect()})
+                    CompanionScreen(state,{url,room->DeviceConnectionService.start(this,url,room)},{DeviceConnectionService.stop(this)})
                 }
             }
         }
