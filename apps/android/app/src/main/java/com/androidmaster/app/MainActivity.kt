@@ -113,7 +113,7 @@ private fun CompanionScreen(state:BridgeState,onConnect:(String,String)->Unit,on
         val accessibilityComponent=ComponentName(accessibilityContext,RemoteAccessibilityService::class.java).flattenToString()
         val enabledServices=Settings.Secure.getString(accessibilityContext.contentResolver,Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES).orEmpty()
         val accessibilityEnabled=enabledServices.split(":").any{it.equals(accessibilityComponent,true)}
-        Text(if(accessibilityEnabled)"Remote swipe and navigation: enabled" else "Remote swipe and navigation require Android Accessibility permission.",style=MaterialTheme.typography.bodySmall)
+        Text(if(accessibilityEnabled)"Remote tap, swipe and navigation: enabled" else "Remote tap, swipe, app launch and navigation require Android Accessibility permission.",style=MaterialTheme.typography.bodySmall)
         Button(onClick=onEnableAccessibility,modifier=Modifier.fillMaxWidth()){Text(if(accessibilityEnabled)"Review Accessibility settings" else "Enable remote swipe & navigation")}
         Button(onClick=onEnableNotificationAccess,modifier=Modifier.fillMaxWidth()){Text("Enable notification reading in Android Settings")}
         Button(onClick=onChooseFileFolder,modifier=Modifier.fillMaxWidth()){Text(if(state.fileAccessEnabled)"Change shared folder" else "Choose shared folder for file manager")}
@@ -121,7 +121,7 @@ private fun CompanionScreen(state:BridgeState,onConnect:(String,String)->Unit,on
         TextButton(onClick=onStopScreenCapture,modifier=Modifier.fillMaxWidth()){Text("Stop screen sharing")}
         Button(onClick=onStartCameraPreview,modifier=Modifier.fillMaxWidth()){Text("Start camera preview on this phone")}
         TextButton(onClick=onStopCameraPreview,modifier=Modifier.fillMaxWidth()){Text("Stop camera preview")}
-        Text("Android requires you to approve special permissions in system Settings. Screen capture, file transfer, notification reading and camera preview still require their dedicated implementations and permissions.",style=MaterialTheme.typography.bodySmall)
+        Text("Android requires your explicit approval for Accessibility, screen capture, notification access, camera permission and a shared folder. Screen sharing and camera preview display ongoing foreground notifications; file access is limited to the folder you select.",style=MaterialTheme.typography.bodySmall)
         if(showApps){
             Text("Launchable apps visible to AndroidMaster: ${state.apps.size}",fontWeight=FontWeight.Medium)
             Column(verticalArrangement=Arrangement.spacedBy(6.dp)){
