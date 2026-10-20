@@ -71,6 +71,15 @@ test("dashboard disconnect preserves the device pairing for reconnect",async t=>
 });
 
 
+test("relay forwards contacts snapshot requests to the Android device",async t=>{
+  const port=await startRelay(t);const room=roomCode();
+  const controller=await connect(port,"controller",room);t.after(()=>controller.terminate());
+  const device=await connect(port,"device",room);t.after(()=>device.terminate());
+  controller.send(JSON.stringify({type:"contacts.list",payload:{}}));
+  const forwarded=await nextMessage(device,m=>m.type==="contacts.list");
+  assert.equal(forwarded.type,"contacts.list");
+});
+
 test("relay forwards validated remote tap coordinates to the Android device",async t=>{
   const port=await startRelay(t);const room=roomCode();
   const controller=await connect(port,"controller",room);t.after(()=>controller.terminate());
