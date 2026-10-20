@@ -93,3 +93,18 @@ test("controller reconnects to the same pairing room after a transient disconnec
   const paired=await nextMessage(device,m=>m.type==="controller.connected");
   assert.equal(paired.type,"controller.connected");
 });
+
+test("device can rejoin its saved room after a transient network disconnect",async t=>{
+  const port=await startRelay(t);const room=roomCode();
+  const controller=await connect(port,"controller",room);t.after(()=>controller.terminate());
+  const firstDevice=await connect(port,"device",room);
+  await nextMessage(controller,m=>m.type==="device.connected");
+  const deviceGone=nextMessage(controller,m=>m.type==="device.disconnected");
+  firstDevice.close();
+  await deviceGone;
+  const secondDevice=await connect(port,"device",room);t.after(()=>secondDevice.terminate());
+  const restored=await nextMessage(controller,m=>m.type==="device.connected");
+  assert.equal(restored.type,"device.connected");
+  const paired=await nextMessage(secondDevice,m=>m.type==="controller.connected");
+  assert.equal(paired.type,"controller.connected");
+});
