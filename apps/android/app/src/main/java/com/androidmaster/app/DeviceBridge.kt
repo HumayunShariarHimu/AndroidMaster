@@ -103,7 +103,7 @@ class DeviceBridge(private val context: Context) {
                         "screen.start"->{_state.value=_state.value.copy(screenCaptureRequested=true);reportDeviceEvent("screen.permission_required",true,"Approve Android screen-capture prompt on the phone")}
                         "screen.stop"->{ScreenCaptureService.stop(context);reportDeviceEvent("screen.stopped",true,"Screen capture stop requested")}
                         "notifications.list"->{val listener=DeviceNotificationListener.instance;if(listener!=null)listener.sendSnapshot() else reportDeviceEvent("notification.permission_required",false,"Enable AndroidMaster in Android Notification access settings") }
-                        "files.list"->listFiles()
+                        "files.list"->listFiles(payload.optString("parentDocumentId",""))
                         "files.download"->downloadFile(payload.optString("documentId"))
                         "files.upload.begin"->beginFileUpload(payload)
                         "files.upload.chunk"->writeFileUploadChunk(payload)
@@ -131,12 +131,13 @@ class DeviceBridge(private val context: Context) {
     fun saveFileTree(uri:Uri){prefs.edit().putString("file_tree_uri",uri.toString()).apply();_state.value=_state.value.copy(fileAccessEnabled=true);reportDeviceEvent("files.permission",true,"Shared folder access saved")}
     private fun fileTreeUri():Uri?=prefs.getString("file_tree_uri",null)?.let{Uri.parse(it)}
     private fun fileEvent(event:String,data:JSONObject){send("device.event",JSONObject().put("event",event).put("message",data.toString()))}
-    private fun listFiles(){
+    private fun listFiles(parentDocumentId:String=""){
         val tree=fileTreeUri()
         if(tree==null){reportDeviceEvent("files.permission_required",false,"Choose a shared folder in the Android app first");return}
         try{
             val root=DocumentsContract.getTreeDocumentId(tree)
-            val children=DocumentsContract.buildChildDocumentsUriUsingTree(tree,root)
+            val parentId=parentDocumentId.ifBlank{root}
+            val children=DocumentsContract.buildChildDocumentsUriUsingTree(tree,parentId)
             val rows=JSONArray()
             contentResolverQuery(children)?.use{cursor->
                 val idCol=cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
@@ -151,7 +152,7 @@ class DeviceBridge(private val context: Context) {
                         .put("modified",if(modifiedCol>=0&&!cursor.isNull(modifiedCol))cursor.getLong(modifiedCol) else 0L))
                 }
             }
-            fileEvent("files.list",JSONObject().put("files",rows))
+            fileEvent("files.list",JSONObject().put("parentDocumentId",parentId).put("files",rows))
         }catch(e:Exception){reportDeviceEvent("files.error",false,e.message?:"Unable to list shared folder")}
     }
     private fun contentResolverQuery(uri:Uri)=context.contentResolver.query(uri,arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID,DocumentsContract.Document.COLUMN_DISPLAY_NAME,DocumentsContract.Document.COLUMN_MIME_TYPE,DocumentsContract.Document.COLUMN_SIZE,DocumentsContract.Document.COLUMN_LAST_MODIFIED),null,null,DocumentsContract.Document.COLUMN_DISPLAY_NAME)
