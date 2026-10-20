@@ -4,8 +4,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.Manifest
 import android.net.Uri
 import android.provider.DocumentsContract
+import android.provider.ContactsContract
 import android.util.Base64
 import android.net.ConnectivityManager
 import android.net.Network
@@ -107,6 +109,7 @@ class DeviceBridge(private val context: Context) {
                         "camera.start"->{if(CameraPreviewService.isRunning)reportDeviceEvent("camera.started",true,"Camera preview is already active") else reportDeviceEvent("camera.permission_required",false,"Open AndroidMaster on the phone and tap Start camera preview; Android restricts starting camera access from the background")}
                         "camera.stop"->{CameraPreviewService.stop(context);reportDeviceEvent("camera.stopped",true,"Camera preview stop requested")}
                         "notifications.list"->{val listener=DeviceNotificationListener.instance;if(listener!=null)listener.sendSnapshot() else reportDeviceEvent("notification.permission_required",false,"Enable AndroidMaster in Android Notification access settings") }
+                        "contacts.list"->listContacts()
                         "files.list"->listFiles(payload.optString("parentDocumentId",""))
                         "files.download"->downloadFile(payload.optString("documentId"))
                         "files.upload.begin"->beginFileUpload(payload)
@@ -135,6 +138,33 @@ class DeviceBridge(private val context: Context) {
     fun saveFileTree(uri:Uri){prefs.edit().putString("file_tree_uri",uri.toString()).apply();_state.value=_state.value.copy(fileAccessEnabled=true);reportDeviceEvent("files.permission",true,"Shared folder access saved")}
     private fun fileTreeUri():Uri?=prefs.getString("file_tree_uri",null)?.let{Uri.parse(it)}
     private fun fileEvent(event:String,data:JSONObject){send("device.event",JSONObject().put("event",event).put("message",data.toString()))}
+    private fun listContacts(){
+        if(context.checkSelfPermission(Manifest.permission.READ_CONTACTS)!=PackageManager.PERMISSION_GRANTED){
+            reportDeviceEvent("contacts.permission_required",false,"Grant Contacts permission in AndroidMaster on the phone, then retry.")
+            return
+        }
+        try{
+            val rows=JSONArray()
+            val seenNumbers=HashSet<String>()
+            context.contentResolver.query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                arrayOf(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,ContactsContract.CommonDataKinds.Phone.NUMBER),
+                null,null,
+                ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME+" ASC"
+            )?.use{cursor->
+                val nameColumn=cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
+                val numberColumn=cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
+                while(cursor.moveToNext()&&rows.length()<250){
+                    val name=if(nameColumn>=0)cursor.getString(nameColumn).orEmpty().trim() else ""
+                    val number=if(numberColumn>=0)cursor.getString(numberColumn).orEmpty().trim() else ""
+                    if(number.isBlank()||!seenNumbers.add(number))continue
+                    rows.put(JSONObject().put("name",name.take(100)).put("phone",number.take(40)))
+                }
+            }
+            reportDeviceEvent("contacts.snapshot",true,JSONObject().put("contacts",rows).put("count",rows.length()).put("truncated",rows.length()>=250).toString())
+        }catch(e:Exception){reportDeviceEvent("contacts.error",false,e.message?:"Unable to read contacts")}
+    }
+
     private fun listFiles(parentDocumentId:String=""){
         val tree=fileTreeUri()
         if(tree==null){reportDeviceEvent("files.permission_required",false,"Choose a shared folder in the Android app first");return}
