@@ -7,6 +7,8 @@ import android.content.pm.PackageManager
 import android.os.BatteryManager
 import android.os.Build
 import android.os.SystemClock
+import android.os.Handler
+import android.os.Looper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import okhttp3.OkHttpClient
@@ -25,15 +27,32 @@ data class BridgeState(val connected: Boolean=false,val connecting: Boolean=fals
 class DeviceBridge(private val context: Context) {
     private val client=OkHttpClient.Builder().connectTimeout(10,TimeUnit.SECONDS).readTimeout(0,TimeUnit.MILLISECONDS).pingInterval(25,TimeUnit.SECONDS).build()
     private var socket: WebSocket?=null
+    private val prefs=context.getSharedPreferences("androidmaster_device",Context.MODE_PRIVATE)
+    private val handler=Handler(Looper.getMainLooper())
+    @Volatile private var reconnectWanted=false
+    private var reconnectDelayMs=3000L
+    private var lastUrl=""
+    private var lastRoom=""
+    private val reconnectTask=Runnable { if(reconnectWanted&&lastUrl.isNotBlank()&&lastRoom.isNotBlank()) connect(lastUrl,lastRoom) }
     private val _state=MutableStateFlow(BridgeState())
     val state=_state.asStateFlow()
+
+    fun autoConnectSaved(){
+        val savedUrl=prefs.getString("relay_url","").orEmpty()
+        val savedRoom=prefs.getString("device_code","").orEmpty()
+        if(savedUrl.isNotBlank()&&savedRoom.isNotBlank())connect(savedUrl,savedRoom)
+    }
 
     fun connect(relayBaseUrl: String, room: String) {
         val base=relayBaseUrl.trim().trimEnd('/')
         val secret=room.trim()
         if(!base.startsWith("ws://")&&!base.startsWith("wss://")){_state.value=_state.value.copy(error="Relay URL must start with ws:// or wss://");return}
         if(!Regex("^[a-fA-F0-9]{48}$").matches(secret)){_state.value=_state.value.copy(error="Pairing secret must be the 48-character value shown by the dashboard");return}
-        disconnect()
+        handler.removeCallbacks(reconnectTask)
+        reconnectWanted=true
+        lastUrl=base;lastRoom=secret;reconnectDelayMs=3000L
+        prefs.edit().putString("relay_url",base).putString("device_code",secret).apply()
+        socket?.cancel();socket=null
         val request=Request.Builder().url("$base/ws?role=device&room=$secret").build()
         _state.value=_state.value.copy(connecting=true,error=null,lastMessage="Connecting to relay…")
         socket=client.newWebSocket(request,object:WebSocketListener(){
@@ -49,11 +68,12 @@ class DeviceBridge(private val context: Context) {
                     }
                 }catch(e:Exception){_state.value=_state.value.copy(error="Invalid relay message: ${e.message}")}
             }
-            override fun onFailure(webSocket:WebSocket,t:Throwable,response:Response?){_state.value=_state.value.copy(connected=false,connecting=false,error=t.message?:"Relay connection failed",lastMessage="Connection failed")}
-            override fun onClosed(webSocket:WebSocket,code:Int,reason:String){_state.value=_state.value.copy(connected=false,connecting=false,lastMessage="Disconnected: $reason")}
+            override fun onFailure(webSocket:WebSocket,t:Throwable,response:Response?){_state.value=_state.value.copy(connected=false,connecting=false,error=t.message?:"Relay connection failed",lastMessage="Connection failed");scheduleReconnect()}
+            override fun onClosed(webSocket:WebSocket,code:Int,reason:String){_state.value=_state.value.copy(connected=false,connecting=false,lastMessage="Disconnected: $reason");scheduleReconnect()}
         })
     }
-    fun disconnect(){socket?.close(1000,"user_disconnected");socket=null;_state.value=_state.value.copy(connected=false,connecting=false,lastMessage="Disconnected")}
+    private fun scheduleReconnect(){if(!reconnectWanted)return;handler.removeCallbacks(reconnectTask);handler.postDelayed(reconnectTask,reconnectDelayMs);reconnectDelayMs=(reconnectDelayMs*2).coerceAtMost(30000L)}
+    fun disconnect(clearSaved:Boolean=true){reconnectWanted=false;handler.removeCallbacks(reconnectTask);socket?.close(1000,"user_disconnected");socket=null;if(clearSaved){prefs.edit().remove("relay_url").remove("device_code").apply();lastUrl="";lastRoom=""};_state.value=_state.value.copy(connected=false,connecting=false,lastMessage="Disconnected")}
     private fun send(type:String,payload:JSONObject){socket?.send(JSONObject().put("type",type).put("payload",payload).toString())}
     private fun statusPayload():JSONObject{
         val battery=context.registerReceiver(null,IntentFilter(Intent.ACTION_BATTERY_CHANGED))
