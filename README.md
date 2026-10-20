@@ -12,7 +12,7 @@ A native Android companion, web dashboard, and WebSocket relay for controlling A
 - File manager lists files/folders inside a user-selected Storage Access Framework folder, navigates subfolders, downloads files, uploads files in chunks (up to 200 MB), and requests deletion. The user grants access to the chosen folder on the phone.
 - Notification reading uses an Android NotificationListenerService and requires the user to enable AndroidMaster under Android Notification access settings.
 - Camera preview uses Camera2 and a foreground service. Camera permission must be granted and preview started from the Android app while it is visible; Android restricts background camera starts.
-- Web and Android both have explicit disconnect controls. A dashboard disconnect is propagated to Android and clears the saved enrollment so it does not silently reconnect.
+- The dashboard can detach without deleting the phone's saved pairing: the Android companion stays connected to the relay and can be controlled again when the owner reconnects with the same pairing secret. The owner can still explicitly disconnect on the phone to stop background reconnection and clear the saved enrollment.
 - CI builds the web dashboard and Android APK and runs relay protocol integration tests.
 
 ## Layout
@@ -32,7 +32,7 @@ The relay is deployed separately from the Vercel web UI. Set the host's `PORT` a
 
 ## Important limitations
 
-This implementation is substantially expanded but is not yet a complete AirDroid replacement. SMS/contacts, remote clipboard, arbitrary settings toggles, device-wide app permissions, full desktop-grade file operations, persistent server-side device history, and full multi-device end-to-end validation remain outstanding. The device registry currently lives in the browser's local storage; the relay's live socket-room mappings are in memory. Both clients retry their saved enrollment code after network or relay recovery, but this recovery still needs real-phone testing against the deployed Render relay.
+This implementation is substantially expanded but is not yet a complete AirDroid replacement. SMS/contacts, remote clipboard, arbitrary settings toggles, device-wide app permissions, full desktop-grade file operations, persistent server-side device history, and full multi-device end-to-end validation remain outstanding. The device registry currently lives in the browser's local storage; the relay's live socket-room mappings are in memory. The Android companion retries its saved pairing after network or relay recovery; the dashboard's device list and pairing secrets are still browser-local, and this recovery still needs real-phone testing against the deployed relay.
 
 Android force-stop, phone shutdown, battery restrictions, captive portals, OS background-start rules, or a device without internet can interrupt background operation. The boot receiver attempts reconnect after reboot, but this needs real-device verification and some manufacturers' battery policies may block it. Android requires explicit owner consent for screen capture, Accessibility, Notification access, camera and shared-folder permissions; an app cannot silently grant these. Camera preview must be started from the visible Android app because modern Android restricts background camera starts.
 

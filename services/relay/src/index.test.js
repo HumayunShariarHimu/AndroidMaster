@@ -49,14 +49,25 @@ test("relay forwards validated navigation commands between controller and device
   assert.equal(forwarded.payload.durationMs,350);
 });
 
-test("explicit controller disconnect notifies the device before closing the room",async t=>{
+test("dashboard disconnect preserves the device pairing for reconnect",async t=>{
   const port=await startRelay(t);const room=roomCode();
   const controller=await connect(port,"controller",room);t.after(()=>controller.terminate());
   const device=await connect(port,"device",room);t.after(()=>device.terminate());
-  const disconnected=nextMessage(device,m=>m.type==="controller.disconnect");
+  await nextMessage(controller,m=>m.type==="device.connected");
+  const detached=nextMessage(device,m=>m.type==="controller.disconnected");
+  const closed=new Promise(resolve=>controller.once("close",resolve));
   controller.send(JSON.stringify({type:"controller.disconnect",payload:{}}));
-  const message=await disconnected;
-  assert.equal(message.payload.reason,"owner_disconnected");
+  await Promise.all([detached,closed]);
+  assert.equal(device.readyState,WebSocket.OPEN,"phone socket must stay connected");
+
+  const secondController=await connect(port,"controller",room);t.after(()=>secondController.terminate());
+  const restored=await nextMessage(secondController,m=>m.type==="device.connected");
+  assert.equal(restored.type,"device.connected");
+  const paired=await nextMessage(device,m=>m.type==="controller.connected");
+  assert.equal(paired.type,"controller.connected");
+  const command=nextMessage(device,m=>m.type==="device.status.get");
+  secondController.send(JSON.stringify({type:"device.status.get",payload:{}}));
+  assert.equal((await command).type,"device.status.get");
 });
 
 
