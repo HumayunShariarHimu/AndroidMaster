@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 class MainActivity:ComponentActivity(){
     private lateinit var bridge:DeviceBridge
     private val notificationPermissionLauncher=registerForActivityResult(ActivityResultContracts.RequestPermission()){}
+    private val cameraPermissionLauncher=registerForActivityResult(ActivityResultContracts.RequestPermission()){granted->if(granted)CameraPreviewService.start(this) else bridge.reportDeviceEvent("camera.permission_required",false,"Camera permission was denied")}
     private val screenCaptureLauncher=registerForActivityResult(ActivityResultContracts.StartActivityForResult()){result->val data=result.data;if(result.resultCode==Activity.RESULT_OK&&data!=null)ScreenCaptureService.start(this,result.resultCode,data) else bridge.clearScreenCaptureRequest()}
     private val fileTreePickerLauncher=registerForActivityResult(ActivityResultContracts.OpenDocumentTree()){uri->if(uri!=null){try{contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION);bridge.saveFileTree(uri)}catch(e:Exception){bridge.reportDeviceEvent("files.permission",false,e.message?:"Unable to save folder permission")}}}
     override fun onCreate(savedInstanceState:Bundle?){
@@ -71,7 +72,7 @@ class MainActivity:ComponentActivity(){
                     }
                 }
                 Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background) {
-                    CompanionScreen(state,{url,room->DeviceConnectionService.start(this,url,room)},{DeviceConnectionService.stop(this)},{startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))},{startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))},{fileTreePickerLauncher.launch(null)})
+                    CompanionScreen(state,{url,room->DeviceConnectionService.start(this,url,room)},{DeviceConnectionService.stop(this)},{startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))},{startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))},{fileTreePickerLauncher.launch(null)},{if(ContextCompat.checkSelfPermission(this,Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED)CameraPreviewService.start(this) else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)},{CameraPreviewService.stop(this)})
                 }
             }
         }
@@ -79,7 +80,7 @@ class MainActivity:ComponentActivity(){
 }
 
 @Composable
-private fun CompanionScreen(state:BridgeState,onConnect:(String,String)->Unit,onDisconnect:()->Unit,onEnableAccessibility:()->Unit,onEnableNotificationAccess:()->Unit,onChooseFileFolder:()->Unit){
+private fun CompanionScreen(state:BridgeState,onConnect:(String,String)->Unit,onDisconnect:()->Unit,onEnableAccessibility:()->Unit,onEnableNotificationAccess:()->Unit,onChooseFileFolder:()->Unit,onStartCameraPreview:()->Unit,onStopCameraPreview:()->Unit){
     var relayUrl by remember{mutableStateOf("wss://androidmaster-relay.onrender.com")}
     var room by remember{mutableStateOf("")}
     var showApps by remember{mutableStateOf(false)}
@@ -114,6 +115,8 @@ private fun CompanionScreen(state:BridgeState,onConnect:(String,String)->Unit,on
         Button(onClick=onEnableAccessibility,modifier=Modifier.fillMaxWidth()){Text(if(accessibilityEnabled)"Review Accessibility settings" else "Enable remote swipe & navigation")}
         Button(onClick=onEnableNotificationAccess,modifier=Modifier.fillMaxWidth()){Text("Enable notification reading in Android Settings")}
         Button(onClick=onChooseFileFolder,modifier=Modifier.fillMaxWidth()){Text(if(state.fileAccessEnabled)"Change shared folder" else "Choose shared folder for file manager")}
+        Button(onClick=onStartCameraPreview,modifier=Modifier.fillMaxWidth()){Text("Start camera preview on this phone")}
+        TextButton(onClick=onStopCameraPreview,modifier=Modifier.fillMaxWidth()){Text("Stop camera preview")}
         Text("Android requires you to approve special permissions in system Settings. Screen capture, file transfer, notification reading and camera preview still require their dedicated implementations and permissions.",style=MaterialTheme.typography.bodySmall)
         if(showApps){
             Text("Launchable apps visible to AndroidMaster: ${state.apps.size}",fontWeight=FontWeight.Medium)
