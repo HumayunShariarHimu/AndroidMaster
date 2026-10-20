@@ -41,6 +41,7 @@ class MainActivity:ComponentActivity(){
     override fun onCreate(savedInstanceState:Bundle?){
         super.onCreate(savedInstanceState)
         bridge=DeviceBridge(applicationContext)
+        bridge.autoConnectSaved()
         setContent {
             MaterialTheme {
                 val state by bridge.state.collectAsState()
@@ -50,7 +51,6 @@ class MainActivity:ComponentActivity(){
             }
         }
     }
-    override fun onDestroy(){bridge.disconnect();super.onDestroy()}
 }
 
 @Composable
