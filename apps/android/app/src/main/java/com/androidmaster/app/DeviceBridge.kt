@@ -100,6 +100,7 @@ class DeviceBridge(private val context: Context) {
                         "apps.list"->sendApps()
                         "app.launch"->launchApp(payload.optString("packageName"))
                         "remote.gesture"->performRemoteSwipe(payload)
+                        "remote.tap"->performRemoteTap(payload)
                         "remote.global_action"->performGlobalAction(payload.optString("action"))
                         "screen.start"->{_state.value=_state.value.copy(screenCaptureRequested=true);reportDeviceEvent("screen.permission_required",true,"Approve Android screen-capture prompt on the phone")}
                         "screen.stop"->{ScreenCaptureService.stop(context);reportDeviceEvent("screen.stopped",true,"Screen capture stop requested")}
@@ -249,6 +250,16 @@ class DeviceBridge(private val context: Context) {
         }
         service.swipe(payload.optDouble("x1",0.5).toFloat(),payload.optDouble("y1",0.8).toFloat(),payload.optDouble("x2",0.5).toFloat(),payload.optDouble("y2",0.2).toFloat(),payload.optLong("durationMs",350L)){ok->
             send("device.event",JSONObject().put("event","gesture.result").put("ok",ok).put("message",if(ok)"Swipe dispatched" else "Android cancelled the gesture"))
+        }
+    }
+    private fun performRemoteTap(payload:JSONObject){
+        val service=RemoteAccessibilityService.instance
+        if(service==null){
+            reportDeviceEvent("tap.result",false,"Enable AndroidMaster Accessibility service in Android Settings first")
+            return
+        }
+        service.tap(payload.optDouble("x",0.5).toFloat(),payload.optDouble("y",0.5).toFloat()){ok->
+            reportDeviceEvent("tap.result",ok,if(ok)"Tap dispatched" else "Android cancelled the tap")
         }
     }
     private fun performGlobalAction(action:String){
