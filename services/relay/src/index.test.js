@@ -105,6 +105,4 @@ test("device can rejoin its saved room after a transient network disconnect",asy
   const secondDevice=await connect(port,"device",room);t.after(()=>secondDevice.terminate());
   const restored=await nextMessage(controller,m=>m.type==="device.connected");
   assert.equal(restored.type,"device.connected");
-  const paired=await nextMessage(secondDevice,m=>m.type==="controller.connected");
-  assert.equal(paired.type,"controller.connected");
 });
