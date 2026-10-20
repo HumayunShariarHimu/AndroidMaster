@@ -148,11 +148,11 @@ class DeviceBridge(private val context: Context) {
             val seenNumbers=HashSet<String>()
             context.contentResolver.query(
                 ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-                arrayOf(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,ContactsContract.CommonDataKinds.Phone.NUMBER),
+                arrayOf(ContactsContract.Contacts.DISPLAY_NAME,ContactsContract.CommonDataKinds.Phone.NUMBER),
                 null,null,
-                ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME+" ASC"
+                ContactsContract.Contacts.DISPLAY_NAME+" ASC"
             )?.use{cursor->
-                val nameColumn=cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
+                val nameColumn=cursor.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME)
                 val numberColumn=cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
                 while(cursor.moveToNext()&&rows.length()<250){
                     val name=if(nameColumn>=0)cursor.getString(nameColumn).orEmpty().trim() else ""
