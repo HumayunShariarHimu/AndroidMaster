@@ -1,6 +1,8 @@
 package com.androidmaster.app
 
 import android.content.Context
+import android.content.ClipboardManager
+import android.content.ClipData
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
@@ -109,6 +111,8 @@ class DeviceBridge(private val context: Context) {
                         "camera.start"->{if(CameraPreviewService.isRunning)reportDeviceEvent("camera.started",true,"Camera preview is already active") else reportDeviceEvent("camera.permission_required",false,"Open AndroidMaster on the phone and tap Start camera preview; Android restricts starting camera access from the background")}
                         "camera.stop"->{CameraPreviewService.stop(context);reportDeviceEvent("camera.stopped",true,"Camera preview stop requested")}
                         "notifications.list"->{val listener=DeviceNotificationListener.instance;if(listener!=null)listener.sendSnapshot() else reportDeviceEvent("notification.permission_required",false,"Enable AndroidMaster in Android Notification access settings") }
+                        "notifications.dismiss"->{val listener=DeviceNotificationListener.instance;if(listener!=null)listener.dismiss(payload.optString("key")) else reportDeviceEvent("notification.permission_required",false,"Enable AndroidMaster in Android Notification access settings") }
+                        "clipboard.set"->{val text=payload.optString("text","");if(text.length>10000)reportDeviceEvent("clipboard.error",false,"Clipboard text is limited to 10,000 characters") else try{val clipboard=context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager;clipboard.setPrimaryClip(ClipData.newPlainText("AndroidMaster",text));reportDeviceEvent("clipboard.set",true,"Copied "+text.length+" characters to the phone clipboard")}catch(e:Exception){reportDeviceEvent("clipboard.error",false,e.message?:"Unable to set phone clipboard")}}
                         "contacts.list"->listContacts()
                         "files.list"->listFiles(payload.optString("parentDocumentId",""))
                         "files.download"->downloadFile(payload.optString("documentId"))

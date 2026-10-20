@@ -19,6 +19,7 @@ class DeviceNotificationListener:NotificationListenerService(){
             .put("postedAt",sbn.postTime)
         DeviceBridgeHolder.get(applicationContext).reportDeviceEvent(event,true,data.toString())
     }
+    fun dismiss(key:String){if(key.isBlank()){DeviceBridgeHolder.get(applicationContext).reportDeviceEvent("notification.dismiss.error",false,"Missing notification key");return};try{cancelNotification(key);DeviceBridgeHolder.get(applicationContext).reportDeviceEvent("notification.dismiss",true,"Notification dismissal requested")}catch(e:Exception){DeviceBridgeHolder.get(applicationContext).reportDeviceEvent("notification.dismiss.error",false,e.message?:"Unable to dismiss notification")}}
     fun sendSnapshot(){publishSnapshot()}
     private fun publishSnapshot(){
         try{
