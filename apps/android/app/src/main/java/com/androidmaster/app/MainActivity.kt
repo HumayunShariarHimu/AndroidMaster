@@ -69,13 +69,22 @@ class MainActivity:ComponentActivity(){
         setContent {
             MaterialTheme {
                 val state by bridge.state.collectAsState()
-                LaunchedEffect(state.screenCaptureRequested) {
+                val activityLifecycleOwner=androidx.compose.ui.platform.LocalLifecycleOwner.current
+                var activityResumeEpoch by remember{mutableStateOf(0)}
+                DisposableEffect(activityLifecycleOwner){
+                    val observer=LifecycleEventObserver{_,event->if(event==Lifecycle.Event.ON_RESUME)activityResumeEpoch++}
+                    activityLifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose{activityLifecycleOwner.lifecycle.removeObserver(observer)}
+                }
+                LaunchedEffect(state.screenCaptureRequested,activityResumeEpoch) {
                     if(state.screenCaptureRequested) {
-                        bridge.clearScreenCaptureRequest()
-                        if(lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+                        if(activityLifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                            bridge.clearScreenCaptureRequest()
                             val manager=getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
                             screenCaptureLauncher.launch(manager.createScreenCaptureIntent())
-                        } else bridge.reportDeviceEvent("screen.permission_required",false,"Open AndroidMaster on the phone and tap Start screen sharing to approve Android capture permission")
+                        } else {
+                            bridge.reportDeviceEvent("screen.permission_required",false,"Screen sharing is queued. Open AndroidMaster on the phone to show Android's screen-capture approval prompt.")
+                        }
                     }
                 }
                 Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background) {
