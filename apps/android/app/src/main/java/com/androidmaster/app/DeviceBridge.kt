@@ -102,6 +102,8 @@ class DeviceBridge(private val context: Context) {
                         "remote.global_action"->performGlobalAction(payload.optString("action"))
                         "screen.start"->{_state.value=_state.value.copy(screenCaptureRequested=true);reportDeviceEvent("screen.permission_required",true,"Approve Android screen-capture prompt on the phone")}
                         "screen.stop"->{ScreenCaptureService.stop(context);reportDeviceEvent("screen.stopped",true,"Screen capture stop requested")}
+                        "camera.start"->{if(CameraPreviewService.isRunning)reportDeviceEvent("camera.started",true,"Camera preview is already active") else reportDeviceEvent("camera.permission_required",false,"Open AndroidMaster on the phone and tap Start camera preview; Android restricts starting camera access from the background")}
+                        "camera.stop"->{CameraPreviewService.stop(context);reportDeviceEvent("camera.stopped",true,"Camera preview stop requested")}
                         "notifications.list"->{val listener=DeviceNotificationListener.instance;if(listener!=null)listener.sendSnapshot() else reportDeviceEvent("notification.permission_required",false,"Enable AndroidMaster in Android Notification access settings") }
                         "files.list"->listFiles(payload.optString("parentDocumentId",""))
                         "files.download"->downloadFile(payload.optString("documentId"))
@@ -209,6 +211,7 @@ class DeviceBridge(private val context: Context) {
     }
     fun clearScreenCaptureRequest(){_state.value=_state.value.copy(screenCaptureRequested=false)}
     fun sendScreenFrame(base64Jpeg:String){send("screen.frame",JSONObject().put("image",base64Jpeg).put("capturedAt",System.currentTimeMillis()))}
+    fun sendCameraFrame(base64Jpeg:String){send("camera.frame",JSONObject().put("image",base64Jpeg).put("capturedAt",System.currentTimeMillis()))}
     fun reportDeviceEvent(event:String,ok:Boolean,message:String){send("device.event",JSONObject().put("event",event).put("ok",ok).put("message",message))}
     private fun send(type:String,payload:JSONObject){socket?.send(JSONObject().put("type",type).put("payload",payload).toString())}
     private fun statusPayload():JSONObject{
