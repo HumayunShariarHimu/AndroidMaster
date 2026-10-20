@@ -27,6 +27,21 @@ class RemoteAccessibilityService : AccessibilityService() {
         }, null)
     }
 
+    fun tap(x: Float, y: Float, callback: (Boolean) -> Unit) {
+        val width = resources.displayMetrics.widthPixels.toFloat().coerceAtLeast(1f)
+        val height = resources.displayMetrics.heightPixels.toFloat().coerceAtLeast(1f)
+        val px = x.coerceIn(0f, 1f) * width
+        val py = y.coerceIn(0f, 1f) * height
+        val path = Path().apply { moveTo(px, py) }
+        val gesture = GestureDescription.Builder()
+            .addStroke(GestureDescription.StrokeDescription(path, 0, 80L))
+            .build()
+        dispatchGesture(gesture, object : GestureResultCallback() {
+            override fun onCompleted(gestureDescription: GestureDescription?) = callback(true)
+            override fun onCancelled(gestureDescription: GestureDescription?) = callback(false)
+        }, null)
+    }
+
     fun launchPackage(packageName:String):String? {
         val launch=packageManager.getLaunchIntentForPackage(packageName)
             ?: return "No launch activity available for this package"
