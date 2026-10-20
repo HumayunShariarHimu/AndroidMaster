@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: androidmaster-relay
+    runtime: node
+    plan: free
+    rootDir: services/relay
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
