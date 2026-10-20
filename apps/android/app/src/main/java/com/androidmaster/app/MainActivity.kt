@@ -55,12 +55,12 @@ class MainActivity:ComponentActivity(){
 
 @Composable
 private fun CompanionScreen(state:BridgeState,onConnect:(String,String)->Unit,onDisconnect:()->Unit){
-    var relayUrl by remember{mutableStateOf("wss://YOUR-RELAY-DOMAIN")}
+    var relayUrl by remember{mutableStateOf("wss://androidmaster-relay.onrender.com")}
     var room by remember{mutableStateOf("")}
     var showApps by remember{mutableStateOf(false)}
     Column(Modifier.fillMaxSize().padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
         Text("AndroidMaster",style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)
-        Text("Personal Android companion · pair only with your own dashboard",style=MaterialTheme.typography.bodyMedium)
+        Text("Personal Android companion · your private device workspace",style=MaterialTheme.typography.bodyMedium)
         Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){
             Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
                 Text(if(state.connected)"CONNECTED" else if(state.connecting)"CONNECTING…" else "NOT CONNECTED",fontWeight=FontWeight.Bold)
@@ -72,7 +72,7 @@ private fun CompanionScreen(state:BridgeState,onConnect:(String,String)->Unit,on
             }
         }
         OutlinedTextField(relayUrl,{relayUrl=it},modifier=Modifier.fillMaxWidth(),label={Text("Relay URL")},supportingText={Text("Use wss:// for deployment; ws:// only for local testing.")},singleLine=true)
-        OutlinedTextField(room,{room=it.trim()},modifier=Modifier.fillMaxWidth(),label={Text("Pairing secret from web dashboard")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Ascii),singleLine=true)
+        OutlinedTextField(room,{room=it.trim()},modifier=Modifier.fillMaxWidth(),label={Text("Device access code")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Ascii),singleLine=true)
         Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){
             Button(onClick={onConnect(relayUrl,room)},enabled=!state.connected&&!state.connecting){Text("Connect")}
             TextButton(onClick=onDisconnect,enabled=state.connected||state.connecting){Text("Disconnect")}
