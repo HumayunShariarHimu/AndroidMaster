@@ -6,8 +6,8 @@ A native Android companion, web dashboard, and WebSocket relay for controlling A
 
 - Server-verified owner-password login for the web dashboard. Configure `ADMIN_PASSWORD` and a strong random `AUTH_SECRET` in the web host environment; never commit either value to source.
 - The browser keeps a local device registry with a separate long-lived enrollment code per phone. Codes remain in that browser's local storage and must be enrolled on each Android companion.
-- The browser and Android companion use reconnect backoff; Android also listens for network availability. After ordinary network loss or relay restart, both ends retry the same room code. Android's foreground connection service helps keep the socket alive when the activity is closed.
-- Android reports real device model, Android version, battery/charging status and installed launchable apps. Remote app launch, Back/Home/Recents/notification-shade actions and swipe gestures require the user to enable AndroidMaster's Accessibility service.
+- The browser and Android companion use reconnect backoff; Android also listens for network availability. After ordinary network loss or relay restart, both ends retry the same room code. Android's foreground connection service helps keep the socket alive when the activity is closed. A boot receiver attempts to restart the saved connection after `BOOT_COMPLETED` when Android permits background service startup.
+- Android reports real device model, Android version, battery/charging status and installed launchable apps. Remote app launch, live-screen tap, Back/Home/Recents/notification-shade actions and swipe gestures require the user to enable AndroidMaster's Accessibility service.
 - Screen sharing uses Android MediaProjection. The device owner must approve the system capture prompt; a visible foreground-service notification remains while sharing.
 - File manager lists files/folders inside a user-selected Storage Access Framework folder, navigates subfolders, downloads files, uploads files in chunks (up to 200 MB), and requests deletion. The user grants access to the chosen folder on the phone.
 - Notification reading uses an Android NotificationListenerService and requires the user to enable AndroidMaster under Android Notification access settings.
@@ -34,9 +34,22 @@ The relay is deployed separately from the Vercel web UI. Set the host's `PORT` a
 
 This implementation is substantially expanded but is not yet a complete AirDroid replacement. SMS/contacts, remote clipboard, arbitrary settings toggles, device-wide app permissions, full desktop-grade file operations, persistent server-side device history, and full multi-device end-to-end validation remain outstanding. The device registry currently lives in the browser's local storage; the relay's live socket-room mappings are in memory. Both clients retry their saved enrollment code after network or relay recovery, but this recovery still needs real-phone testing against the deployed Render relay.
 
-Android force-stop, phone shutdown, reboot, battery restrictions, captive portals, OS background-start rules, or a device without internet can interrupt background operation. Android requires explicit owner consent for screen capture, Accessibility, Notification access, camera and shared-folder permissions; an app cannot silently grant these. Camera preview must be started from the visible Android app because modern Android restricts background camera starts.
+Android force-stop, phone shutdown, battery restrictions, captive portals, OS background-start rules, or a device without internet can interrupt background operation. The boot receiver attempts reconnect after reboot, but this needs real-device verification and some manufacturers' battery policies may block it. Android requires explicit owner consent for screen capture, Accessibility, Notification access, camera and shared-folder permissions; an app cannot silently grant these. Camera preview must be started from the visible Android app because modern Android restricts background camera starts.
 
 The CI build proves that source compiles and protocol tests pass; it does not replace testing on a real phone, confirming Render relay health, or verifying each permission and transfer end-to-end.
+
+## Release verification checklist
+
+1. Confirm the relay health endpoint returns `ok: true` and the web dashboard loads over HTTPS.
+2. Install the generated debug APK, enter the dashboard enrollment code, and verify the device returns online after Wi-Fi/mobile-data is toggled off and back on.
+3. Enable Accessibility, start screen sharing from the phone, then test tap, swipe, Back/Home/Recents and app launch from the dashboard.
+4. Select a shared folder and test subfolder navigation, upload, download and delete with small files first.
+5. Enable Notification access and verify notification snapshot plus posted/removed updates.
+6. Start camera preview from the visible phone app, verify frames reach the dashboard, then stop it.
+7. Reboot the phone without force-stopping AndroidMaster and verify the saved relay connection returns after boot/network recovery.
+8. Repeat with two enrolled phones and switch between their separate codes in the same browser.
+
+These are manual device checks; do not mark them complete based on CI alone.
 
 ## Local development
 
