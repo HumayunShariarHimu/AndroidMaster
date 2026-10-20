@@ -5,8 +5,9 @@ Deploy as a persistent Node.js service (for example Render), separate from the V
 - Health: `GET /healthz`
 - WebSocket: `/ws?role=controller&room=<48-hex-device-code>` or `/ws?role=device&room=<same-device-code>`
 - The device code is a long-lived enrollment credential. Generate it with a cryptographically secure random generator; never publish or log it.
-- The controller may reconnect with the same code after a browser refresh. An unexpected controller disconnect leaves the Android socket alive so the dashboard can reattach.
-- An explicit `controller.disconnect` closes both ends. Android's own Disconnect button clears the saved device code and stops its reconnect loop.
-- Android stores the relay URL and device code locally and reconnects with backoff. A foreground service helps keep the socket alive while the app UI is closed; Android force-stop, device shutdown, network loss, battery restrictions, or a relay restart can still interrupt service.
-- The relay currently keeps live socket-room mappings in process memory. Reconnect works across browser reloads while this relay process stays up, but server restarts erase active room mappings; durable multi-device registry/storage is not implemented yet.
+- The controller can reconnect after browser refresh and automatically retries after socket/network failures. Android retries with exponential backoff and also reacts to default-network availability.
+- An unexpected controller disconnect leaves the Android socket alive. An explicit `controller.disconnect` is sent to Android before both sockets close; Android clears saved enrollment and stops its foreground connection service so it does not silently reconnect.
+- The controller/device protocol forwards app launch, remote navigation gestures, screen frames, camera frames, notification snapshots, file listing, chunked file upload/download, and file deletion requests.
+- Screen and camera frames use bounded JSON/base64 messages; the relay's maximum WebSocket message size is 1 MiB. File transfers are chunked below that limit.
+- Live room mappings remain in process memory. After a relay restart, the Android service and dashboard must reconnect using their saved enrollment code to recreate the room. There is no persistent server-side device history or cross-instance coordination; deploy a single relay instance unless shared state is added.
 - Set `PORT` from the host. Use TLS termination and `wss://` for public access. Single-instance only; do not horizontally scale without shared coordination/storage.
