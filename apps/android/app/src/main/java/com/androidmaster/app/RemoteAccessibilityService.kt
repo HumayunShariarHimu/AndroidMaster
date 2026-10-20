@@ -3,6 +3,8 @@ package com.androidmaster.app
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.graphics.Path
+import android.os.Bundle
+import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityEvent
 
 class RemoteAccessibilityService : AccessibilityService() {
@@ -47,6 +49,16 @@ class RemoteAccessibilityService : AccessibilityService() {
             ?: return "No launch activity available for this package"
         launch.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
         return try { startActivity(launch); null } catch (e:Exception) { e.message ?: "Android blocked the launch request" }
+    }
+
+    fun setFocusedText(text:String):String?{
+        if(text.length>5000)return "Text input is limited to 5,000 characters"
+        val root=rootInActiveWindow?:return "No active app window is available. Open a text field on the phone first."
+        val focused=root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+            ?:return "No focused input field was found. Tap a text field on the phone first."
+        val arguments=Bundle().apply{putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,text)}
+        val updated=focused.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT,arguments)
+        return if(updated)null else "This app does not allow accessibility text replacement in the focused field"
     }
 
     fun globalAction(action: String): Boolean = when(action) {

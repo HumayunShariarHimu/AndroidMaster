@@ -71,6 +71,19 @@ test("dashboard disconnect preserves the device pairing for reconnect",async t=>
 });
 
 
+test("relay forwards focused-field text input and rejects oversized text",async t=>{
+  const port=await startRelay(t);const room=roomCode();
+  const controller=await connect(port,"controller",room);t.after(()=>controller.terminate());
+  const device=await connect(port,"device",room);t.after(()=>device.terminate());
+  const command={type:"remote.text.set",payload:{text:"hello world"}};
+  const forwarded=nextMessage(device,m=>m.type==="remote.text.set");
+  controller.send(JSON.stringify(command));
+  assert.deepEqual(await forwarded,command);
+  const rejected=nextMessage(controller,m=>m.type==="relay.error");
+  controller.send(JSON.stringify({type:"remote.text.set",payload:{text:"x".repeat(5001)}}));
+  assert.equal((await rejected).payload.message,"invalid_remote_text");
+});
+
 test("relay forwards clipboard and notification dismissal commands with payload limits",async t=>{
   const port=await startRelay(t);const room=roomCode();
   const controller=await connect(port,"controller",room);t.after(()=>controller.terminate());

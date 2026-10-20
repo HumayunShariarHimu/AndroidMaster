@@ -106,6 +106,7 @@ class DeviceBridge(private val context: Context) {
                         "remote.gesture"->performRemoteSwipe(payload)
                         "remote.tap"->performRemoteTap(payload)
                         "remote.global_action"->performGlobalAction(payload.optString("action"))
+                        "remote.text.set"->{val text=payload.optString("text","");val service=RemoteAccessibilityService.instance;if(service==null)reportDeviceEvent("remote.text.result",false,"Enable AndroidMaster Accessibility in Android Settings first") else {val failure=service.setFocusedText(text);if(failure==null)reportDeviceEvent("remote.text.result",true,"Text inserted into the focused field") else reportDeviceEvent("remote.text.result",false,failure)}}
                         "screen.start"->{_state.value=_state.value.copy(screenCaptureRequested=true);reportDeviceEvent("screen.permission_required",true,"Approve Android screen-capture prompt on the phone")}
                         "screen.stop"->{ScreenCaptureService.stop(context);reportDeviceEvent("screen.stopped",true,"Screen capture stop requested")}
                         "camera.start"->{if(CameraPreviewService.isRunning)reportDeviceEvent("camera.started",true,"Camera preview is already active") else reportDeviceEvent("camera.permission_required",false,"Open AndroidMaster on the phone and tap Start camera preview; Android restricts starting camera access from the background")}
