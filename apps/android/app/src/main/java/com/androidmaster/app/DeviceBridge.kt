@@ -37,7 +37,9 @@ class DeviceBridge(private val context: Context) {
     private val _state=MutableStateFlow(BridgeState())
     val state=_state.asStateFlow()
 
-    fun hasSavedConnection():Boolean=prefs.getString("relay_url",null)!=null&&prefs.getString("device_code",null)!=null\n\n    fun autoConnectSaved(){
+    fun hasSavedConnection():Boolean=prefs.getString("relay_url",null)!=null&&prefs.getString("device_code",null)!=null
+
+    fun autoConnectSaved(){
         val savedUrl=prefs.getString("relay_url","").orEmpty()
         val savedRoom=prefs.getString("device_code","").orEmpty()
         if(savedUrl.isNotBlank()&&savedRoom.isNotBlank())connect(savedUrl,savedRoom)
