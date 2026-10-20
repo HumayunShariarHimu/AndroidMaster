@@ -77,6 +77,6 @@ class CameraPreviewService:Service(){
         @Volatile var isRunning=false
             private set
         fun start(context:Context){val i=Intent(context,CameraPreviewService::class.java);if(Build.VERSION.SDK_INT>=26)context.startForegroundService(i) else context.startService(i)}
-        fun stop(context:Context){context.startService(Intent(context,CameraPreviewService::class.java).setAction(ACTION_STOP))}
+        fun stop(context:Context){context.stopService(Intent(context,CameraPreviewService::class.java))}
     }
 }
