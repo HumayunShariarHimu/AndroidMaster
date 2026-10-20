@@ -57,6 +57,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 class MainActivity:ComponentActivity(){
     private lateinit var bridge:DeviceBridge
     private val notificationPermissionLauncher=registerForActivityResult(ActivityResultContracts.RequestPermission()){}
+    private val contactsPermissionLauncher=registerForActivityResult(ActivityResultContracts.RequestPermission()){}
     private val cameraPermissionLauncher=registerForActivityResult(ActivityResultContracts.RequestPermission()){granted->if(granted)CameraPreviewService.start(this) else bridge.reportDeviceEvent("camera.permission_required",false,"Camera permission was denied")}
     private val screenCaptureLauncher=registerForActivityResult(ActivityResultContracts.StartActivityForResult()){result->val data=result.data;if(result.resultCode==Activity.RESULT_OK&&data!=null)ScreenCaptureService.start(this,result.resultCode,data) else bridge.clearScreenCaptureRequest()}
     private val fileTreePickerLauncher=registerForActivityResult(ActivityResultContracts.OpenDocumentTree()){uri->if(uri!=null){try{contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION);bridge.saveFileTree(uri)}catch(e:Exception){bridge.reportDeviceEvent("files.permission",false,e.message?:"Unable to save folder permission")}}}
@@ -78,7 +79,7 @@ class MainActivity:ComponentActivity(){
                     }
                 }
                 Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background) {
-                    CompanionScreen(state,{url,room->DeviceConnectionService.start(this,url,room)},{DeviceConnectionService.stop(this)},{startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))},{startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))},{fileTreePickerLauncher.launch(null)},{if(ContextCompat.checkSelfPermission(this,Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED)CameraPreviewService.start(this) else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)},{CameraPreviewService.stop(this)},{val manager=getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager;screenCaptureLauncher.launch(manager.createScreenCaptureIntent())},{ScreenCaptureService.stop(this)},{startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:$packageName")))})
+                    CompanionScreen(state,{url,room->DeviceConnectionService.start(this,url,room)},{DeviceConnectionService.stop(this)},{startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))},{startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))},{fileTreePickerLauncher.launch(null)},{if(ContextCompat.checkSelfPermission(this,Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED)CameraPreviewService.start(this) else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)},{CameraPreviewService.stop(this)},{val manager=getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager;screenCaptureLauncher.launch(manager.createScreenCaptureIntent())},{ScreenCaptureService.stop(this)},{startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:$packageName")))},{contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)})
                 }
             }
         }
@@ -86,7 +87,7 @@ class MainActivity:ComponentActivity(){
 }
 
 @Composable
-private fun CompanionScreen(state:BridgeState,onConnect:(String,String)->Unit,onDisconnect:()->Unit,onEnableAccessibility:()->Unit,onEnableNotificationAccess:()->Unit,onChooseFileFolder:()->Unit,onStartCameraPreview:()->Unit,onStopCameraPreview:()->Unit,onStartScreenCapture:()->Unit,onStopScreenCapture:()->Unit,onOpenAppDetails:()->Unit){
+private fun CompanionScreen(state:BridgeState,onConnect:(String,String)->Unit,onDisconnect:()->Unit,onEnableAccessibility:()->Unit,onEnableNotificationAccess:()->Unit,onChooseFileFolder:()->Unit,onStartCameraPreview:()->Unit,onStopCameraPreview:()->Unit,onStartScreenCapture:()->Unit,onStopScreenCapture:()->Unit,onOpenAppDetails:()->Unit,onRequestContactsPermission:()->Unit){
     var permissionRefresh by remember{mutableStateOf(0)}
     val lifecycleOwner=LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner){
@@ -127,12 +128,15 @@ private fun CompanionScreen(state:BridgeState,onConnect:(String,String)->Unit,on
         val notificationListeners=Settings.Secure.getString(accessibilityContext.contentResolver,"enabled_notification_listeners").orEmpty()
         val notificationAccessEnabled=notificationListeners.split(":").any{it.contains(accessibilityContext.packageName,true)&&it.contains(DeviceNotificationListener::class.java.simpleName,true)}
         val cameraGranted=androidx.core.content.ContextCompat.checkSelfPermission(accessibilityContext,Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED
+        val contactsGranted=androidx.core.content.ContextCompat.checkSelfPermission(accessibilityContext,Manifest.permission.READ_CONTACTS)==PackageManager.PERMISSION_GRANTED
         Text("Permission status",style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.SemiBold)
-        Text("Accessibility: ${if(accessibilityEnabled)"Enabled" else "Not enabled"} · Notification access: ${if(notificationAccessEnabled)"Enabled" else "Not enabled"} · Camera: ${if(cameraGranted)"Allowed" else "Not allowed"} · Shared folder: ${if(state.fileAccessEnabled)"Selected" else "Not selected"}",style=MaterialTheme.typography.bodySmall)
+        Text("Accessibility: ${if(accessibilityEnabled)"Enabled" else "Not enabled"} · Notification access: ${if(notificationAccessEnabled)"Enabled" else "Not enabled"} · Camera: ${if(cameraGranted)"Allowed" else "Not allowed"} · Contacts: ${if(contactsGranted)"Allowed" else "Not allowed"} · Shared folder: ${if(state.fileAccessEnabled)"Selected" else "Not selected"}",style=MaterialTheme.typography.bodySmall)
         if(permissionRefresh>0)Text("Permission status refreshed after returning from Android Settings.",style=MaterialTheme.typography.bodySmall)
         Button(onClick=onEnableAccessibility,modifier=Modifier.fillMaxWidth()){Text(if(accessibilityEnabled)"Review Accessibility settings" else "Enable remote swipe & navigation")}
         Button(onClick=onEnableNotificationAccess,modifier=Modifier.fillMaxWidth()){Text(if(notificationAccessEnabled)"Review notification access" else "Enable notification reading in Android Settings")}
         Button(onClick=onOpenAppDetails,modifier=Modifier.fillMaxWidth()){Text("Open AndroidMaster app settings")}
+        Button(onClick={if(contactsGranted)onOpenAppDetails() else onRequestContactsPermission()},modifier=Modifier.fillMaxWidth()){Text(if(contactsGranted)"Review contacts permission" else "Allow contact access")}
+        Text("Remote contacts are only read after you grant Contacts permission here; the dashboard can request a snapshot while this permission remains enabled.",style=MaterialTheme.typography.bodySmall)
         Text("If Android shows a Restricted setting warning (common on Android 13+ for sideloaded APKs), open this app’s App info, tap the three-dot menu, choose Allow restricted settings, then return here and enable Accessibility. AndroidMaster cannot grant this special access itself.",style=MaterialTheme.typography.bodySmall)
         Button(onClick=onChooseFileFolder,modifier=Modifier.fillMaxWidth()){Text(if(state.fileAccessEnabled)"Change shared folder" else "Choose shared folder for file manager")}
         Button(onClick=onStartScreenCapture,modifier=Modifier.fillMaxWidth()){Text("Start screen sharing on this phone")}
