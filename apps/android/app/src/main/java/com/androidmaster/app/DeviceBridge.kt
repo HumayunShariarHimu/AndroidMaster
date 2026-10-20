@@ -4,6 +4,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import android.os.BatteryManager
 import android.os.Build
 import android.os.SystemClock
@@ -29,6 +32,17 @@ class DeviceBridge(private val context: Context) {
     private var socket: WebSocket?=null
     private val prefs=context.getSharedPreferences("androidmaster_device",Context.MODE_PRIVATE)
     private val handler=Handler(Looper.getMainLooper())
+    private val connectivityManager=context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    private val networkCallback=object:ConnectivityManager.NetworkCallback(){
+        override fun onAvailable(network:Network){
+            handler.post {
+                if(reconnectWanted && lastUrl.isNotBlank() && lastRoom.isNotBlank() && !_state.value.connected && !_state.value.connecting){
+                    handler.removeCallbacks(reconnectTask)
+                    connect(lastUrl,lastRoom)
+                }
+            }
+        }
+    }
     @Volatile private var reconnectWanted=false
     private var reconnectDelayMs=3000L
     private var lastUrl=""
@@ -36,6 +50,8 @@ class DeviceBridge(private val context: Context) {
     private val reconnectTask=Runnable { if(reconnectWanted&&lastUrl.isNotBlank()&&lastRoom.isNotBlank()) connect(lastUrl,lastRoom) }
     private val _state=MutableStateFlow(BridgeState())
     val state=_state.asStateFlow()
+
+    init { try { connectivityManager.registerDefaultNetworkCallback(networkCallback) } catch (_:Exception) { } }
 
     fun hasSavedConnection():Boolean=prefs.getString("relay_url",null)!=null&&prefs.getString("device_code",null)!=null
 
