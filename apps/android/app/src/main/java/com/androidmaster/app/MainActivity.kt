@@ -1,6 +1,9 @@
 package com.androidmaster.app
 
 import android.os.Bundle
+import android.app.Activity
+import android.content.Context
+import android.media.projection.MediaProjectionManager
 import android.content.ComponentName
 import android.content.Intent
 import android.provider.Settings
@@ -35,6 +38,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,6 +53,7 @@ import androidx.compose.ui.unit.dp
 class MainActivity:ComponentActivity(){
     private lateinit var bridge:DeviceBridge
     private val notificationPermissionLauncher=registerForActivityResult(ActivityResultContracts.RequestPermission()){}
+    private val screenCaptureLauncher=registerForActivityResult(ActivityResultContracts.StartActivityForResult()){result->val data=result.data;if(result.resultCode==Activity.RESULT_OK&&data!=null)ScreenCaptureService.start(this,result.resultCode,data) else bridge.clearScreenCaptureRequest()}
     override fun onCreate(savedInstanceState:Bundle?){
         super.onCreate(savedInstanceState)
         bridge=DeviceBridgeHolder.get(applicationContext)
@@ -57,6 +62,13 @@ class MainActivity:ComponentActivity(){
         setContent {
             MaterialTheme {
                 val state by bridge.state.collectAsState()
+                LaunchedEffect(state.screenCaptureRequested) {
+                    if(state.screenCaptureRequested) {
+                        bridge.clearScreenCaptureRequest()
+                        val manager=getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+                        screenCaptureLauncher.launch(manager.createScreenCaptureIntent())
+                    }
+                }
                 Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background) {
                     CompanionScreen(state,{url,room->DeviceConnectionService.start(this,url,room)},{DeviceConnectionService.stop(this)},{startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))})
                 }
