@@ -76,8 +76,9 @@ class ScreenCaptureService:Service(){
         virtualDisplay=null
         try{reader?.setOnImageAvailableListener(null,null);reader?.close()}catch(_:Exception){}
         reader=null
-        try{projection?.stop()}catch(_:Exception){}
+        val activeProjection=projection
         projection=null
+        try{activeProjection?.stop()}catch(_:Exception){}
     }
     override fun onDestroy(){stopCapture();if(Build.VERSION.SDK_INT>=24)stopForeground(STOP_FOREGROUND_REMOVE) else @Suppress("DEPRECATION") stopForeground(true);super.onDestroy()}
     override fun onBind(intent:Intent?):IBinder?=null
