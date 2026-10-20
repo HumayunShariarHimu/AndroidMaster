@@ -93,6 +93,7 @@ class DeviceBridge(private val context: Context) {
                         "remote.global_action"->performGlobalAction(payload.optString("action"))
                         "screen.start"->{_state.value=_state.value.copy(screenCaptureRequested=true);reportDeviceEvent("screen.permission_required",true,"Approve Android screen-capture prompt on the phone")}
                         "screen.stop"->{ScreenCaptureService.stop(context);reportDeviceEvent("screen.stopped",true,"Screen capture stop requested")}
+                        "notifications.list"->{val listener=DeviceNotificationListener.instance;if(listener!=null)listener.sendSnapshot() else reportDeviceEvent("notification.permission_required",false,"Enable AndroidMaster in Android Notification access settings") }
                     }
                 }catch(e:Exception){_state.value=_state.value.copy(error="Invalid relay message: ${e.message}")}
             }
