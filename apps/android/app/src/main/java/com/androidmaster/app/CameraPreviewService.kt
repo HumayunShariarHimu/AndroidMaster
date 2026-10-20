@@ -33,6 +33,7 @@ class CameraPreviewService:Service(){
     override fun onCreate(){super.onCreate();bridge=DeviceBridgeHolder.get(applicationContext);createChannel();isRunning=true}
     override fun onStartCommand(intent:Intent?,flags:Int,startId:Int):Int{
         if(intent?.action==ACTION_STOP){stopSelf();return START_NOT_STICKY}
+        if(::thread.isInitialized)return START_STICKY
         if(Build.VERSION.SDK_INT>=29)startForeground(NOTIFICATION_ID,notification(),ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA) else startForeground(NOTIFICATION_ID,notification())
         thread=HandlerThread("AndroidMasterCamera").apply{start()};worker=Handler(thread.looper)
         try{openCamera()}catch(e:Exception){bridge.reportDeviceEvent("camera.error",false,e.message?:"Unable to open camera");stopSelf()}
