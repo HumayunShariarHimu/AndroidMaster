@@ -37,7 +37,7 @@ class DeviceBridge(private val context: Context) {
     private val _state=MutableStateFlow(BridgeState())
     val state=_state.asStateFlow()
 
-    fun autoConnectSaved(){
+    fun hasSavedConnection():Boolean=prefs.getString("relay_url",null)!=null&&prefs.getString("device_code",null)!=null\n\n    fun autoConnectSaved(){
         val savedUrl=prefs.getString("relay_url","").orEmpty()
         val savedRoom=prefs.getString("device_code","").orEmpty()
         if(savedUrl.isNotBlank()&&savedRoom.isNotBlank())connect(savedUrl,savedRoom)
@@ -109,5 +109,13 @@ class DeviceBridge(private val context: Context) {
             send("app.launch.result",JSONObject().put("ok",true).put("message","Launch requested: $packageName"))
             _state.value=_state.value.copy(lastMessage="Launched $packageName")
         }catch(e:Exception){send("app.launch.result",JSONObject().put("ok",false).put("message",e.message?:"Launch failed"));_state.value=_state.value.copy(error=e.message?:"Launch failed")}
+    }
+}
+
+
+object DeviceBridgeHolder {
+    @Volatile private var instance: DeviceBridge? = null
+    fun get(context: Context): DeviceBridge = instance ?: synchronized(this) {
+        instance ?: DeviceBridge(context.applicationContext).also { instance = it }
     }
 }
