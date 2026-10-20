@@ -54,6 +54,7 @@ class MainActivity:ComponentActivity(){
     private lateinit var bridge:DeviceBridge
     private val notificationPermissionLauncher=registerForActivityResult(ActivityResultContracts.RequestPermission()){}
     private val screenCaptureLauncher=registerForActivityResult(ActivityResultContracts.StartActivityForResult()){result->val data=result.data;if(result.resultCode==Activity.RESULT_OK&&data!=null)ScreenCaptureService.start(this,result.resultCode,data) else bridge.clearScreenCaptureRequest()}
+    private val fileTreePickerLauncher=registerForActivityResult(ActivityResultContracts.OpenDocumentTree()){uri->if(uri!=null){try{contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION);bridge.saveFileTree(uri)}catch(e:Exception){bridge.reportDeviceEvent("files.permission",false,e.message?:"Unable to save folder permission")}}}
     override fun onCreate(savedInstanceState:Bundle?){
         super.onCreate(savedInstanceState)
         bridge=DeviceBridgeHolder.get(applicationContext)
@@ -70,7 +71,7 @@ class MainActivity:ComponentActivity(){
                     }
                 }
                 Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background) {
-                    CompanionScreen(state,{url,room->DeviceConnectionService.start(this,url,room)},{DeviceConnectionService.stop(this)},{startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))},{startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))})
+                    CompanionScreen(state,{url,room->DeviceConnectionService.start(this,url,room)},{DeviceConnectionService.stop(this)},{startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))},{startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))},{fileTreePickerLauncher.launch(null)})
                 }
             }
         }
@@ -78,7 +79,7 @@ class MainActivity:ComponentActivity(){
 }
 
 @Composable
-private fun CompanionScreen(state:BridgeState,onConnect:(String,String)->Unit,onDisconnect:()->Unit,onEnableAccessibility:()->Unit,onEnableNotificationAccess:()->Unit){
+private fun CompanionScreen(state:BridgeState,onConnect:(String,String)->Unit,onDisconnect:()->Unit,onEnableAccessibility:()->Unit,onEnableNotificationAccess:()->Unit,onChooseFileFolder:()->Unit){
     var relayUrl by remember{mutableStateOf("wss://androidmaster-relay.onrender.com")}
     var room by remember{mutableStateOf("")}
     var showApps by remember{mutableStateOf(false)}
@@ -112,6 +113,7 @@ private fun CompanionScreen(state:BridgeState,onConnect:(String,String)->Unit,on
         Text(if(accessibilityEnabled)"Remote swipe and navigation: enabled" else "Remote swipe and navigation require Android Accessibility permission.",style=MaterialTheme.typography.bodySmall)
         Button(onClick=onEnableAccessibility,modifier=Modifier.fillMaxWidth()){Text(if(accessibilityEnabled)"Review Accessibility settings" else "Enable remote swipe & navigation")}
         Button(onClick=onEnableNotificationAccess,modifier=Modifier.fillMaxWidth()){Text("Enable notification reading in Android Settings")}
+        Button(onClick=onChooseFileFolder,modifier=Modifier.fillMaxWidth()){Text(if(state.fileAccessEnabled)"Change shared folder" else "Choose shared folder for file manager")}
         Text("Android requires you to approve special permissions in system Settings. Screen capture, file transfer, notification reading and camera preview still require their dedicated implementations and permissions.",style=MaterialTheme.typography.bodySmall)
         if(showApps){
             Text("Launchable apps visible to AndroidMaster: ${state.apps.size}",fontWeight=FontWeight.Medium)
