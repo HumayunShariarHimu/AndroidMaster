@@ -1,6 +1,6 @@
 import { get, put } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
-import { isAuthenticated } from "../../lib/session";
+import { isAuthenticated } from "../../../lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
