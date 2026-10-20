@@ -1,0 +1,93 @@
+package com.androidmaster.app
+
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.content.pm.PackageManager
+import android.os.BatteryManager
+import android.os.Build
+import android.os.SystemClock
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Response
+import okhttp3.WebSocket
+import okhttp3.WebSocketListener
+import org.json.JSONArray
+import org.json.JSONObject
+import java.util.concurrent.TimeUnit
+
+data class InstalledApp(val label: String, val packageName: String)
+data class DeviceSnapshot(val model: String, val androidVersion: String, val batteryPercent: Int, val charging: Boolean)
+data class BridgeState(val connected: Boolean=false,val connecting: Boolean=false,val error: String?=null,val apps: List<InstalledApp> = emptyList(),val device: DeviceSnapshot?=null,val lastMessage: String="Not connected")
+
+class DeviceBridge(private val context: Context) {
+    private val client=OkHttpClient.Builder().connectTimeout(10,TimeUnit.SECONDS).readTimeout(0,TimeUnit.MILLISECONDS).pingInterval(25,TimeUnit.SECONDS).build()
+    private var socket: WebSocket?=null
+    private val _state=MutableStateFlow(BridgeState())
+    val state=_state.asStateFlow()
+
+    fun connect(relayBaseUrl: String, room: String) {
+        val base=relayBaseUrl.trim().trimEnd('/')
+        val secret=room.trim()
+        if(!base.startsWith("ws://")&&!base.startsWith("wss://")){_state.value=_state.value.copy(error="Relay URL must start with ws:// or wss://");return}
+        if(!Regex("^[a-fA-F0-9]{48}$").matches(secret)){_state.value=_state.value.copy(error="Pairing secret must be the 48-character value shown by the dashboard");return}
+        disconnect()
+        val request=Request.Builder().url("$base/ws?role=device&room=$secret").build()
+        _state.value=_state.value.copy(connecting=true,error=null,lastMessage="Connecting to relay…")
+        socket=client.newWebSocket(request,object:WebSocketListener(){
+            override fun onOpen(webSocket:WebSocket,response:Response){_state.value=_state.value.copy(connected=true,connecting=false,error=null,lastMessage="Connected to relay")}
+            override fun onMessage(webSocket:WebSocket,text:String){
+                try {
+                    val msg=JSONObject(text);val type=msg.optString("type");val payload=msg.optJSONObject("payload")?:JSONObject()
+                    when(type){
+                        "controller.connected","relay.ready"->{_state.value=_state.value.copy(lastMessage="Paired. Waiting for dashboard commands");send("device.status.result",statusPayload());sendApps()}
+                        "device.status.get"->send("device.status.result",statusPayload())
+                        "apps.list"->sendApps()
+                        "app.launch"->launchApp(payload.optString("packageName"))
+                    }
+                }catch(e:Exception){_state.value=_state.value.copy(error="Invalid relay message: ${e.message}")}
+            }
+            override fun onFailure(webSocket:WebSocket,t:Throwable,response:Response?){_state.value=_state.value.copy(connected=false,connecting=false,error=t.message?:"Relay connection failed",lastMessage="Connection failed")}
+            override fun onClosed(webSocket:WebSocket,code:Int,reason:String){_state.value=_state.value.copy(connected=false,connecting=false,lastMessage="Disconnected: $reason")}
+        })
+    }
+    fun disconnect(){socket?.close(1000,"user_disconnected");socket=null;_state.value=_state.value.copy(connected=false,connecting=false,lastMessage="Disconnected")}
+    private fun send(type:String,payload:JSONObject){socket?.send(JSONObject().put("type",type).put("payload",payload).toString())}
+    private fun statusPayload():JSONObject{
+        val battery=context.registerReceiver(null,IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val level=battery?.getIntExtra(BatteryManager.EXTRA_LEVEL,-1)?:-1
+        val scale=battery?.getIntExtra(BatteryManager.EXTRA_SCALE,100)?:100
+        val percent=if(level>=0&&scale>0)level*100/scale else -1
+        val batteryStatus=battery?.getIntExtra(BatteryManager.EXTRA_STATUS,-1)?:-1
+        val charging=batteryStatus==BatteryManager.BATTERY_STATUS_CHARGING||batteryStatus==BatteryManager.BATTERY_STATUS_FULL
+        val model="${Build.MANUFACTURER} ${Build.MODEL}".trim()
+        val version=Build.VERSION.RELEASE?:Build.VERSION.SDK_INT.toString()
+        _state.value=_state.value.copy(device=DeviceSnapshot(model,version,percent,charging))
+        return JSONObject().put("model",model).put("androidVersion",version).put("batteryPercent",percent).put("charging",charging).put("uptimeMs",SystemClock.elapsedRealtime())
+    }
+    @Suppress("DEPRECATION")
+    private fun sendApps(){
+        val pm=context.packageManager
+        val installed=if(Build.VERSION.SDK_INT>=33)pm.getInstalledApplications(PackageManager.ApplicationInfoFlags.of(0)) else pm.getInstalledApplications(0)
+        val apps=installed.mapNotNull{info->
+            val launch=pm.getLaunchIntentForPackage(info.packageName)?:return@mapNotNull null
+            val label=pm.getApplicationLabel(info).toString()
+            if(label.isBlank()||launch.component==null)null else InstalledApp(label,info.packageName)
+        }.distinctBy{it.packageName}.sortedBy{it.label.lowercase()}
+        val array=JSONArray()
+        apps.forEach{array.put(JSONObject().put("label",it.label).put("packageName",it.packageName))}
+        _state.value=_state.value.copy(apps=apps,lastMessage="Sent ${apps.size} launchable apps")
+        send("apps.list.result",JSONObject().put("apps",array))
+    }
+    private fun launchApp(packageName:String){
+        if(packageName.isBlank()||packageName.length>255){send("app.launch.result",JSONObject().put("ok",false).put("message","Invalid package name"));return}
+        try{
+            val launch=context.packageManager.getLaunchIntentForPackage(packageName)?:throw IllegalArgumentException("No launch activity available for this package")
+            launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);context.startActivity(launch)
+            send("app.launch.result",JSONObject().put("ok",true).put("message","Launch requested: $packageName"))
+            _state.value=_state.value.copy(lastMessage="Launched $packageName")
+        }catch(e:Exception){send("app.launch.result",JSONObject().put("ok",false).put("message",e.message?:"Launch failed"));_state.value=_state.value.copy(error=e.message?:"Launch failed")}
+    }
+}
