@@ -95,6 +95,7 @@ class DeviceBridge(private val context: Context) {
                     val msg=JSONObject(text);val type=msg.optString("type");val payload=msg.optJSONObject("payload")?:JSONObject()
                     when(type){
                         "controller.connected","relay.ready"->{_state.value=_state.value.copy(lastMessage="Paired. Waiting for dashboard commands");send("device.status.result",statusPayload());sendApps()}
+                        "controller.disconnect"->DeviceConnectionService.stop(context)
                         "device.status.get"->send("device.status.result",statusPayload())
                         "apps.list"->sendApps()
                         "app.launch"->launchApp(payload.optString("packageName"))
