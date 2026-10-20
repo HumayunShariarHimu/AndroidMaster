@@ -71,6 +71,23 @@ test("dashboard disconnect preserves the device pairing for reconnect",async t=>
 });
 
 
+test("relay forwards clipboard and notification dismissal commands with payload limits",async t=>{
+  const port=await startRelay(t);const room=roomCode();
+  const controller=await connect(port,"controller",room);t.after(()=>controller.terminate());
+  const device=await connect(port,"device",room);t.after(()=>device.terminate());
+  for(const command of [
+    {type:"clipboard.set",payload:{text:"hello from dashboard"}},
+    {type:"notifications.dismiss",payload:{key:"notification-key"}}
+  ]){
+    const forwarded=nextMessage(device,m=>m.type===command.type);
+    controller.send(JSON.stringify(command));
+    assert.deepEqual(await forwarded,command);
+  }
+  const rejected=nextMessage(controller,m=>m.type==="relay.error");
+  controller.send(JSON.stringify({type:"clipboard.set",payload:{text:"x".repeat(10001)}}));
+  assert.equal((await rejected).payload.message,"invalid_clipboard_text");
+});
+
 test("relay forwards contacts snapshot requests to the Android device",async t=>{
   const port=await startRelay(t);const room=roomCode();
   const controller=await connect(port,"controller",room);t.after(()=>controller.terminate());
