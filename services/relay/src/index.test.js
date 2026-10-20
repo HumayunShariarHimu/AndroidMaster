@@ -88,6 +88,23 @@ test("relay forwards clipboard and notification dismissal commands with payload 
   assert.equal((await rejected).payload.message,"invalid_clipboard_text");
 });
 
+test("relay forwards folder creation and rename requests with validation",async t=>{
+  const port=await startRelay(t);const room=roomCode();
+  const controller=await connect(port,"controller",room);t.after(()=>controller.terminate());
+  const device=await connect(port,"device",room);t.after(()=>device.terminate());
+  for(const command of [
+    {type:"files.create_folder",payload:{parentDocumentId:"shared-folder",name:"Reports"}},
+    {type:"files.rename",payload:{documentId:"document-123",name:"report-final.txt"}}
+  ]){
+    const forwarded=nextMessage(device,m=>m.type===command.type);
+    controller.send(JSON.stringify(command));
+    assert.deepEqual(await forwarded,command);
+  }
+  const rejected=nextMessage(controller,m=>m.type==="relay.error");
+  controller.send(JSON.stringify({type:"files.create_folder",payload:{parentDocumentId:"shared-folder",name:"../outside"}}));
+  assert.equal((await rejected).payload.message,"invalid_folder_name");
+});
+
 test("relay forwards contacts snapshot requests to the Android device",async t=>{
   const port=await startRelay(t);const room=roomCode();
   const controller=await connect(port,"controller",room);t.after(()=>controller.terminate());

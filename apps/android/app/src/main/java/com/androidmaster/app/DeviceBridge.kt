@@ -120,6 +120,8 @@ class DeviceBridge(private val context: Context) {
                         "files.upload.chunk"->writeFileUploadChunk(payload)
                         "files.upload.end"->finishFileUpload(payload.optString("transferId"))
                         "files.delete"->deleteFile(payload.optString("documentId"))
+                        "files.create_folder"->createFolder(payload.optString("parentDocumentId",""),payload.optString("name"))
+                        "files.rename"->renameFile(payload.optString("documentId"),payload.optString("name"))
                     }
                 }catch(e:Exception){_state.value=_state.value.copy(error="Invalid relay message: ${e.message}")}
             }
@@ -221,7 +223,9 @@ class DeviceBridge(private val context: Context) {
         try{
             uploadStream?.close()
             val root=DocumentsContract.getTreeDocumentId(tree)
-            val parent=DocumentsContract.buildDocumentUriUsingTree(tree,root)
+            val parentId=payload.optString("parentDocumentId").ifBlank{root}
+            if(parentId.length>2048)throw IllegalArgumentException("Invalid destination folder")
+            val parent=DocumentsContract.buildDocumentUriUsingTree(tree,parentId)
             val mime=payload.optString("mimeType").takeIf{it.isNotBlank()}?:"application/octet-stream"
             val target=DocumentsContract.createDocument(context.contentResolver,parent,mime,name)?:throw IllegalStateException("Unable to create destination file")
             uploadStream=context.contentResolver.openOutputStream(target,"wt")?:throw IllegalStateException("Unable to open destination file")
@@ -238,6 +242,29 @@ class DeviceBridge(private val context: Context) {
         if(transferId!=uploadTransferId||uploadStream==null){reportDeviceEvent("file.upload.result",false,"No matching upload is active");return}
         try{uploadStream!!.flush();uploadStream!!.close();uploadStream=null;uploadTransferId=null;if(uploadWrittenBytes!=uploadExpectedBytes)throw IllegalStateException("Uploaded byte count did not match the declared file size");reportDeviceEvent("file.upload.result",true,"File uploaded successfully")}
         catch(e:Exception){reportDeviceEvent("file.upload.result",false,e.message?:"Unable to finish upload")}
+    }
+    private fun createFolder(parentDocumentId:String,name:String){
+        val tree=fileTreeUri()
+        if(tree==null){reportDeviceEvent("files.permission_required",false,"Choose a shared folder in the Android app first");return}
+        if(name.isBlank()||name.length>255||name=="."||name==".."||name.contains("/")||name.contains("\\")){reportDeviceEvent("files.create_folder.result",false,"Folder name is invalid");return}
+        try{
+            val root=DocumentsContract.getTreeDocumentId(tree)
+            val parentId=parentDocumentId.ifBlank{root}
+            if(parentId.length>2048)throw IllegalArgumentException("Invalid parent folder")
+            val parent=DocumentsContract.buildDocumentUriUsingTree(tree,parentId)
+            val created=DocumentsContract.createDocument(context.contentResolver,parent,DocumentsContract.Document.MIME_TYPE_DIR,name)
+            reportDeviceEvent("files.create_folder.result",created!=null,if(created!=null)"Folder created" else "The document provider refused folder creation")
+        }catch(e:Exception){reportDeviceEvent("files.create_folder.result",false,e.message?:"Unable to create folder")}
+    }
+    private fun renameFile(documentId:String,name:String){
+        val tree=fileTreeUri()
+        if(tree==null||documentId.isBlank()){reportDeviceEvent("files.rename.result",false,"Shared folder access or document ID missing");return}
+        if(name.isBlank()||name.length>255||name=="."||name==".."||name.contains("/")||name.contains("\\")){reportDeviceEvent("files.rename.result",false,"File name is invalid");return}
+        try{
+            val uri=DocumentsContract.buildDocumentUriUsingTree(tree,documentId)
+            val renamed=DocumentsContract.renameDocument(context.contentResolver,uri,name)
+            reportDeviceEvent("files.rename.result",renamed!=null,if(renamed!=null)"Renamed to $name" else "The document provider refused renaming")
+        }catch(e:Exception){reportDeviceEvent("files.rename.result",false,e.message?:"Unable to rename file")}
     }
     private fun deleteFile(documentId:String){
         val tree=fileTreeUri()
