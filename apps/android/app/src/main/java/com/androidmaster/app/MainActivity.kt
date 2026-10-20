@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -65,7 +67,7 @@ private fun CompanionScreen(state:BridgeState,onConnect:(String,String)->Unit,on
     var relayUrl by remember{mutableStateOf("wss://androidmaster-relay.onrender.com")}
     var room by remember{mutableStateOf("")}
     var showApps by remember{mutableStateOf(false)}
-    Column(Modifier.fillMaxSize().padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
         Text("AndroidMaster",style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)
         Text("Personal Android companion · your private device workspace",style=MaterialTheme.typography.bodyMedium)
         Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){
@@ -91,8 +93,8 @@ private fun CompanionScreen(state:BridgeState,onConnect:(String,String)->Unit,on
         Text("This build uses internet access and installed-app visibility to list and launch apps. Screen capture, notifications, files and other sensitive permissions will be added with their own visible consent flows.",style=MaterialTheme.typography.bodySmall)
         if(showApps){
             Text("Launchable apps visible to AndroidMaster: ${state.apps.size}",fontWeight=FontWeight.Medium)
-            LazyColumn(verticalArrangement=Arrangement.spacedBy(6.dp)){
-                items(state.apps,key={it.packageName}){app->
+            Column(verticalArrangement=Arrangement.spacedBy(6.dp)){
+                state.apps.forEach{app->
                     Card(shape=RoundedCornerShape(10.dp)){
                         Row(Modifier.fillMaxWidth().padding(10.dp),verticalAlignment=Alignment.CenterVertically){
                             Column(Modifier.weight(1f)){
