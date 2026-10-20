@@ -155,8 +155,9 @@ class DeviceBridge(private val context: Context) {
     private fun launchApp(packageName:String){
         if(packageName.isBlank()||packageName.length>255){send("app.launch.result",JSONObject().put("ok",false).put("message","Invalid package name"));return}
         try{
-            val launch=context.packageManager.getLaunchIntentForPackage(packageName)?:throw IllegalArgumentException("No launch activity available for this package")
-            launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);context.startActivity(launch)
+            val service=RemoteAccessibilityService.instance?:throw IllegalStateException("Enable AndroidMaster Accessibility service in Android Settings to launch apps remotely")
+            val failure=service.launchPackage(packageName)
+            if(failure!=null)throw IllegalStateException(failure)
             send("app.launch.result",JSONObject().put("ok",true).put("message","Launch requested: $packageName"))
             _state.value=_state.value.copy(lastMessage="Launched $packageName")
         }catch(e:Exception){send("app.launch.result",JSONObject().put("ok",false).put("message",e.message?:"Launch failed"));_state.value=_state.value.copy(error=e.message?:"Launch failed")}
