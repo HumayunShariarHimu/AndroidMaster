@@ -19,6 +19,7 @@ class DeviceNotificationListener:NotificationListenerService(){
             .put("postedAt",sbn.postTime)
         DeviceBridgeHolder.get(applicationContext).reportDeviceEvent(event,true,data.toString())
     }
+    fun sendSnapshot(){publishSnapshot()}
     private fun publishSnapshot(){
         try{
             val array=JSONArray()
