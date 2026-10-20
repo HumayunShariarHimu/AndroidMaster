@@ -39,8 +39,16 @@ import androidx.compose.ui.unit.dp
 class MainActivity:ComponentActivity(){
     private lateinit var bridge:DeviceBridge
     override fun onCreate(savedInstanceState:Bundle?){
-        super.onCreate(savedInstanceState);bridge=DeviceBridge(applicationContext)
-        setContent{MaterialTheme{val state by bridge.state.collectAsState();Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background){CompanionScreen(state,{url,room->bridge.connect(url,room)},{bridge.disconnect()})}}}
+        super.onCreate(savedInstanceState)
+        bridge=DeviceBridge(applicationContext)
+        setContent {
+            MaterialTheme {
+                val state by bridge.state.collectAsState()
+                Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background) {
+                    CompanionScreen(state,{url,room->bridge.connect(url,room)},{bridge.disconnect()})
+                }
+            }
+        }
     }
     override fun onDestroy(){bridge.disconnect();super.onDestroy()}
 }
@@ -57,7 +65,10 @@ private fun CompanionScreen(state:BridgeState,onConnect:(String,String)->Unit,on
             Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
                 Text(if(state.connected)"CONNECTED" else if(state.connecting)"CONNECTING…" else "NOT CONNECTED",fontWeight=FontWeight.Bold)
                 Text(state.lastMessage,style=MaterialTheme.typography.bodySmall)
-                state.device?.let{Text(it.model,style=MaterialTheme.typography.titleMedium);Text("Android ${it.androidVersion} · Battery ${if(it.batteryPercent>=0)"${it.batteryPercent}%" else "Unknown"} ${if(it.charging)"· Charging" else ""}")}
+                state.device?.let{
+                    Text(it.model,style=MaterialTheme.typography.titleMedium)
+                    Text("Android ${it.androidVersion} · Battery ${if(it.batteryPercent>=0)"${it.batteryPercent}%" else "Unknown"} ${if(it.charging)"· Charging" else ""}")
+                }
             }
         }
         OutlinedTextField(relayUrl,{relayUrl=it},modifier=Modifier.fillMaxWidth(),label={Text("Relay URL")},supportingText={Text("Use wss:// for deployment; ws:// only for local testing.")},singleLine=true)
@@ -65,12 +76,29 @@ private fun CompanionScreen(state:BridgeState,onConnect:(String,String)->Unit,on
         Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){
             Button(onClick={onConnect(relayUrl,room)},enabled=!state.connected&&!state.connecting){Text("Connect")}
             TextButton(onClick=onDisconnect,enabled=state.connected||state.connecting){Text("Disconnect")}
-            TextButton(onClick={showApps=!showApps){Text(if(showApps)"Hide apps" else "Apps on device")}
+            TextButton(onClick={showApps=!showApps}) { Text(if(showApps)"Hide apps" else "Apps on device") }
         }
         state.error?.let{Text("Error: $it",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
         Divider()
         Text("Permissions & features",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
         Text("This build uses internet access and installed-app visibility to list and launch apps. Screen capture, notifications, files and other sensitive permissions will be added with their own visible consent flows.",style=MaterialTheme.typography.bodySmall)
-        if(showApps){Text("Launchable apps visible to AndroidMaster: ${state.apps.size}",fontWeight=FontWeight.Medium);LazyColumn(verticalArrangement=Arrangement.spacedBy(6.dp)){items(state.apps,key={it.packageName}){app->Card(shape=RoundedCornerShape(10.dp)){Row(Modifier.fillMaxWidth().padding(10.dp),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(app.label,fontWeight=FontWeight.Medium);Text(app.packageName,style=MaterialTheme.typography.labelSmall)}}}}}}else{Spacer(Modifier.height(4.dp));Text("Keep this app open while paired. The dashboard can request the real app list and launch apps on this phone.",style=MaterialTheme.typography.bodySmall)}
+        if(showApps){
+            Text("Launchable apps visible to AndroidMaster: ${state.apps.size}",fontWeight=FontWeight.Medium)
+            LazyColumn(verticalArrangement=Arrangement.spacedBy(6.dp)){
+                items(state.apps,key={it.packageName}){app->
+                    Card(shape=RoundedCornerShape(10.dp)){
+                        Row(Modifier.fillMaxWidth().padding(10.dp),verticalAlignment=Alignment.CenterVertically){
+                            Column(Modifier.weight(1f)){
+                                Text(app.label,fontWeight=FontWeight.Medium)
+                                Text(app.packageName,style=MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
+                }
+            }
+        }else{
+            Spacer(Modifier.height(4.dp))
+            Text("Keep this app open while paired. The dashboard can request the real app list and launch apps on this phone.",style=MaterialTheme.typography.bodySmall)
+        }
     }
 }
