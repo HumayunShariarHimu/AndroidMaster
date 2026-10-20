@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit
 
 data class InstalledApp(val label: String, val packageName: String)
 data class DeviceSnapshot(val model: String, val androidVersion: String, val batteryPercent: Int, val charging: Boolean)
-data class BridgeState(val connected: Boolean=false,val connecting: Boolean=false,val error: String?=null,val apps: List<InstalledApp> = emptyList(),val device: DeviceSnapshot?=null,val lastMessage: String="Not connected")
+data class BridgeState(val connected: Boolean=false,val connecting: Boolean=false,val error: String?=null,val apps: List<InstalledApp> = emptyList(),val device: DeviceSnapshot?=null,val lastMessage: String="Not connected",val screenCaptureRequested:Boolean=false)
 
 class DeviceBridge(private val context: Context) {
     private val client=OkHttpClient.Builder().connectTimeout(10,TimeUnit.SECONDS).readTimeout(0,TimeUnit.MILLISECONDS).pingInterval(25,TimeUnit.SECONDS).build()
@@ -91,6 +91,8 @@ class DeviceBridge(private val context: Context) {
                         "app.launch"->launchApp(payload.optString("packageName"))
                         "remote.gesture"->performRemoteSwipe(payload)
                         "remote.global_action"->performGlobalAction(payload.optString("action"))
+                        "screen.start"->{_state.value=_state.value.copy(screenCaptureRequested=true);reportDeviceEvent("screen.permission_required",true,"Approve Android screen-capture prompt on the phone")}
+                        "screen.stop"->{ScreenCaptureService.stop(context);reportDeviceEvent("screen.stopped",true,"Screen capture stop requested")}
                     }
                 }catch(e:Exception){_state.value=_state.value.copy(error="Invalid relay message: ${e.message}")}
             }
@@ -110,6 +112,9 @@ class DeviceBridge(private val context: Context) {
     }
     private fun scheduleReconnect(){if(!reconnectWanted)return;handler.removeCallbacks(reconnectTask);handler.postDelayed(reconnectTask,reconnectDelayMs);reconnectDelayMs=(reconnectDelayMs*2).coerceAtMost(30000L)}
     fun disconnect(clearSaved:Boolean=true){reconnectWanted=false;handler.removeCallbacks(reconnectTask);socket?.close(1000,"user_disconnected");socket=null;if(clearSaved){prefs.edit().remove("relay_url").remove("device_code").apply();lastUrl="";lastRoom=""};_state.value=_state.value.copy(connected=false,connecting=false,lastMessage="Disconnected")}
+    fun clearScreenCaptureRequest(){_state.value=_state.value.copy(screenCaptureRequested=false)}
+    fun sendScreenFrame(base64Jpeg:String){send("screen.frame",JSONObject().put("image",base64Jpeg).put("capturedAt",System.currentTimeMillis()))}
+    fun reportDeviceEvent(event:String,ok:Boolean,message:String){send("device.event",JSONObject().put("event",event).put("ok",ok).put("message",message))}
     private fun send(type:String,payload:JSONObject){socket?.send(JSONObject().put("type",type).put("payload",payload).toString())}
     private fun statusPayload():JSONObject{
         val battery=context.registerReceiver(null,IntentFilter(Intent.ACTION_BATTERY_CHANGED))
