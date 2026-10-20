@@ -27,6 +27,13 @@ class RemoteAccessibilityService : AccessibilityService() {
         }, null)
     }
 
+    fun launchPackage(packageName:String):String? {
+        val launch=packageManager.getLaunchIntentForPackage(packageName)
+            ?: return "No launch activity available for this package"
+        launch.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        return try { startActivity(launch); null } catch (e:Exception) { e.message ?: "Android blocked the launch request" }
+    }
+
     fun globalAction(action: String): Boolean = when(action) {
         "back" -> performGlobalAction(GLOBAL_ACTION_BACK)
         "home" -> performGlobalAction(GLOBAL_ACTION_HOME)
