@@ -92,6 +92,6 @@ class ScreenCaptureService:Service(){
         private const val CHANNEL_ID="androidmaster_screen_capture"
         private const val NOTIFICATION_ID=7302
         fun start(context:Context,resultCode:Int,data:Intent){val i=Intent(context,ScreenCaptureService::class.java).putExtra(EXTRA_RESULT,resultCode).putExtra(EXTRA_DATA,data);if(Build.VERSION.SDK_INT>=26)context.startForegroundService(i) else context.startService(i)}
-        fun stop(context:Context){context.startService(Intent(context,ScreenCaptureService::class.java).setAction(ACTION_STOP))}
+        fun stop(context:Context){context.stopService(Intent(context,ScreenCaptureService::class.java))}
     }
 }
