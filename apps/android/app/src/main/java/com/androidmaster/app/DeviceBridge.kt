@@ -152,7 +152,7 @@ class DeviceBridge(private val context: Context) {
                         .put("modified",if(modifiedCol>=0&&!cursor.isNull(modifiedCol))cursor.getLong(modifiedCol) else 0L))
                 }
             }
-            fileEvent("files.list",JSONObject().put("parentDocumentId",parentId).put("files",rows))
+            fileEvent("files.list",JSONObject().put("parentDocumentId",parentDocumentId).put("files",rows))
         }catch(e:Exception){reportDeviceEvent("files.error",false,e.message?:"Unable to list shared folder")}
     }
     private fun contentResolverQuery(uri:Uri)=context.contentResolver.query(uri,arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID,DocumentsContract.Document.COLUMN_DISPLAY_NAME,DocumentsContract.Document.COLUMN_MIME_TYPE,DocumentsContract.Document.COLUMN_SIZE,DocumentsContract.Document.COLUMN_LAST_MODIFIED),null,null,DocumentsContract.Document.COLUMN_DISPLAY_NAME)
