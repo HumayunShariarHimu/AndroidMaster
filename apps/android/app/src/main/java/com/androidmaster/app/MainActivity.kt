@@ -67,12 +67,14 @@ class MainActivity:ComponentActivity(){
                 LaunchedEffect(state.screenCaptureRequested) {
                     if(state.screenCaptureRequested) {
                         bridge.clearScreenCaptureRequest()
-                        val manager=getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-                        screenCaptureLauncher.launch(manager.createScreenCaptureIntent())
+                        if(lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+                            val manager=getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+                            screenCaptureLauncher.launch(manager.createScreenCaptureIntent())
+                        } else bridge.reportDeviceEvent("screen.permission_required",false,"Open AndroidMaster on the phone and tap Start screen sharing to approve Android capture permission")
                     }
                 }
                 Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background) {
-                    CompanionScreen(state,{url,room->DeviceConnectionService.start(this,url,room)},{DeviceConnectionService.stop(this)},{startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))},{startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))},{fileTreePickerLauncher.launch(null)},{if(ContextCompat.checkSelfPermission(this,Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED)CameraPreviewService.start(this) else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)},{CameraPreviewService.stop(this)})
+                    CompanionScreen(state,{url,room->DeviceConnectionService.start(this,url,room)},{DeviceConnectionService.stop(this)},{startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))},{startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))},{fileTreePickerLauncher.launch(null)},{if(ContextCompat.checkSelfPermission(this,Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED)CameraPreviewService.start(this) else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)},{CameraPreviewService.stop(this)},{val manager=getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager;screenCaptureLauncher.launch(manager.createScreenCaptureIntent())},{ScreenCaptureService.stop(this)})
                 }
             }
         }
@@ -80,7 +82,7 @@ class MainActivity:ComponentActivity(){
 }
 
 @Composable
-private fun CompanionScreen(state:BridgeState,onConnect:(String,String)->Unit,onDisconnect:()->Unit,onEnableAccessibility:()->Unit,onEnableNotificationAccess:()->Unit,onChooseFileFolder:()->Unit,onStartCameraPreview:()->Unit,onStopCameraPreview:()->Unit){
+private fun CompanionScreen(state:BridgeState,onConnect:(String,String)->Unit,onDisconnect:()->Unit,onEnableAccessibility:()->Unit,onEnableNotificationAccess:()->Unit,onChooseFileFolder:()->Unit,onStartCameraPreview:()->Unit,onStopCameraPreview:()->Unit,onStartScreenCapture:()->Unit,onStopScreenCapture:()->Unit){
     var relayUrl by remember{mutableStateOf("wss://androidmaster-relay.onrender.com")}
     var room by remember{mutableStateOf("")}
     var showApps by remember{mutableStateOf(false)}
@@ -115,6 +117,8 @@ private fun CompanionScreen(state:BridgeState,onConnect:(String,String)->Unit,on
         Button(onClick=onEnableAccessibility,modifier=Modifier.fillMaxWidth()){Text(if(accessibilityEnabled)"Review Accessibility settings" else "Enable remote swipe & navigation")}
         Button(onClick=onEnableNotificationAccess,modifier=Modifier.fillMaxWidth()){Text("Enable notification reading in Android Settings")}
         Button(onClick=onChooseFileFolder,modifier=Modifier.fillMaxWidth()){Text(if(state.fileAccessEnabled)"Change shared folder" else "Choose shared folder for file manager")}
+        Button(onClick=onStartScreenCapture,modifier=Modifier.fillMaxWidth()){Text("Start screen sharing on this phone")}
+        TextButton(onClick=onStopScreenCapture,modifier=Modifier.fillMaxWidth()){Text("Stop screen sharing")}
         Button(onClick=onStartCameraPreview,modifier=Modifier.fillMaxWidth()){Text("Start camera preview on this phone")}
         TextButton(onClick=onStopCameraPreview,modifier=Modifier.fillMaxWidth()){Text("Stop camera preview")}
         Text("Android requires you to approve special permissions in system Settings. Screen capture, file transfer, notification reading and camera preview still require their dedicated implementations and permissions.",style=MaterialTheme.typography.bodySmall)
