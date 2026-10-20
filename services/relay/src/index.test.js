@@ -78,3 +78,18 @@ test("relay rejects remote taps with coordinates outside the normalized screen",
   const error=await nextMessage(controller,m=>m.type==="relay.error");
   assert.equal(error.payload.message,"invalid_tap_coordinates");
 });
+
+test("controller reconnects to the same pairing room after a transient disconnect",async t=>{
+  const port=await startRelay(t);const room=roomCode();
+  const device=await connect(port,"device",room);t.after(()=>device.terminate());
+  const firstController=await connect(port,"controller",room);
+  await nextMessage(firstController,m=>m.type==="device.connected");
+  const controllerGone=nextMessage(device,m=>m.type==="controller.disconnected");
+  firstController.close();
+  await controllerGone;
+  const secondController=await connect(port,"controller",room);t.after(()=>secondController.terminate());
+  const restored=await nextMessage(secondController,m=>m.type==="device.connected");
+  assert.equal(restored.type,"device.connected");
+  const paired=await nextMessage(device,m=>m.type==="controller.connected");
+  assert.equal(paired.type,"controller.connected");
+});
