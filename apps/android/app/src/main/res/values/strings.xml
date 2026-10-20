@@ -1,2 +1,2 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources><string name="app_name">AndroidMaster</string></resources>
+<resources><string name="app_name">AndroidMaster</string><string name="accessibility_service_description">Allows AndroidMaster to perform owner-requested remote swipes and navigation actions.</string></resources>
